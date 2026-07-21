@@ -97,10 +97,12 @@ Configure the account-owned route/custom domain and make `PUBLIC_ORIGIN` and
 pnpm managed-cloud:deploy
 ```
 
-A successful command is not deployment acceptance. Record the URL and verify
-static assets, `/health`, `/ready`, authentication, one control-plane request,
-session issue, MCP initialize/list/call, audit correlation, and rollback. The
-current repository does not claim that live acceptance has passed.
+A successful command is not full deployment acceptance. The public preview at
+[`litemcpcomposer.com`](https://litemcpcomposer.com) has recorded static asset,
+`/health`, `/ready`, unauthenticated Better Auth session, TLS, and canonical
+domain smoke evidence. It does not yet have passing first-admin, privileged
+control-plane, session issue, MCP initialize/list/call, audit correlation,
+SSO/SCIM, rollback, load, or security acceptance.
 
 After the one-time inactive-version bootstrap, the checked-in GitHub deployment
 workflow can run manually or after a green `main` CI build. It requires the

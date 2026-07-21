@@ -26,7 +26,7 @@
     "directory": "../web/dist",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/api/*", "/mcp/*", "/health", "/ready", "/demo-upstreams/*"]
+    "run_worker_first": true
   },
   "vars": {
     "PUBLIC_ORIGIN": "https://litemcpcomposer.com",
@@ -38,12 +38,15 @@
   },
   "kv_namespaces": [
     {
-      "binding": "DATA_KV"
+      "binding": "DATA_KV",
+      "id": "cb5e64d2de304e28b194c6685478f2bf"
     }
   ],
   "d1_databases": [
     {
-      "binding": "AUTH_DB"
+      "binding": "AUTH_DB",
+      "database_name": "litemcp-auth",
+      "database_id": "9f74df58-8248-42be-b23f-2e86797adbcf"
     }
   ]
 }

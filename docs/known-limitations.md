@@ -163,9 +163,14 @@ production-ready enterprise release. This list is intentionally conservative.
 
 ## Operations and deployment
 
-- The managed cloud Wrangler dry-run and local D1 migration pass. Wrangler was
-  not authenticated, no real service was deployed, and no live URL, domain,
-  authentication, API, MCP, or rollback smoke test is recorded.
+- The managed-cloud public preview is deployed at
+  [`litemcpcomposer.com`](https://litemcpcomposer.com). Wrangler deployment,
+  dedicated KV/D1 provisioning, remote migration, secret binding, TLS, static
+  routes/assets, health/readiness, the unauthenticated Better Auth session
+  endpoint, and the apex/`www` canonical-domain behavior passed on 2026-07-21.
+  First-admin onboarding, privileged authentication/control-plane operations,
+  MCP initialize/list/call, audit correlation, SSO/SCIM, rollback, load, and
+  external security acceptance have not passed.
 - Docker server/web images build, Compose renders, and the Helm chart strictly
   lints/renders across checked-in profiles. The full Compose journey has not
   run; its MongoDB evaluation service has no database authentication.

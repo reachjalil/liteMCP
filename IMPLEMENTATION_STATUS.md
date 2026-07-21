@@ -1,8 +1,8 @@
 # Implementation status
 
-Snapshot: 2026-07-21. LiteMCP Composer is a functional local vertical slice,
-not an enterprise-readiness claim. This file records only behavior backed by
-code and reproducible evidence.
+Snapshot: 2026-07-21. LiteMCP Composer is a functional vertical slice with a
+public managed-cloud preview, not an enterprise-readiness claim. This file
+records only behavior backed by code and reproducible evidence.
 
 ## Status vocabulary
 
@@ -22,7 +22,7 @@ code and reproducible evidence.
 | Workspace and CI foundation | Complete | pnpm/Turbo/strict TypeScript/Biome workspace, frozen lockfile, Apache-2.0 project files, and green public CI run [`29805311450`](https://github.com/reachjalil/liteMCP/actions/runs/29805311450) for format/lint/type/test/build/Compose/Helm/containers using current full-SHA-pinned action revisions | Add tagged release, artifact signing, dependency-review, and security-scan workflows |
 | Portable contracts | Partial | Zod domain/API contracts, versioned MCP protocol constant, OpenAPI 3.1 document, and typed SDK surfaces build | Compatibility/version-migration tests and generated-schema drift gate |
 | Product `DocumentStore` | Partial | Portable contract plus memory, Workers KV, and MongoDB adapters; tenant filters, pagination, and revision writes | Durable Object authority, adapter parity tests, transactional outbox, migrations, and failure recovery |
-| Public Astro site | Partial | Thirty-route Astro site, responsive console, generated explainer visuals, metadata, accessibility-conscious markup, and local browser/build QA | Public deployment, formal accessibility/performance audit, content review, and analytics/privacy decision |
+| Public Astro site | Partial | Thirty-route Astro site deployed at [`litemcpcomposer.com`](https://litemcpcomposer.com), responsive console, generated explainer visuals, metadata, accessibility-conscious markup, local browser/build QA, and public route/asset smoke | Formal accessibility/performance audit, content review, and analytics/privacy decision |
 | Authenticated console | Partial | React island uses live overview, create-server/composition, policy simulation, session, audit, IdP, approval, and export APIs | Production first-admin onboarding, complete CRUD journeys, loading/error coverage, and live SSO journey |
 | Control-plane API | Partial | Hono API, Better Auth middleware, organization-role checks, request IDs, size/CORS controls, OpenAPI, problem responses, and integration tests | Idempotency, complete authorization matrix, policy/registry lifecycle, import, and broad negative tests |
 | MCP gateway | Partial | MCP initialize, `tools/list`, and `tools/call`; builtin and remote HTTP composition; aliases, provenance, policy recheck, bounded schema validation, approvals, audit, and session revoke | Protocol conformance, resources/prompts/notifications/resume, genuine SSE, upstream discovery/auth, and client matrix |
@@ -37,7 +37,7 @@ code and reproducible evidence.
 | CLI and SDKs | Partial | Operational CLI, TypeScript SDK, dependency-free Python SDK, and runnable local-composition example | Published-package smoke, full resource coverage, auth flows, stable compatibility policy, and authoring SDK |
 | Docker Compose | Partial | Frozen-lock images build; secret-bearing local files are excluded from build contexts; Compose renders with a runtime-templated same-origin proxy, Mongo replica set, readiness checks, and hardened runtime configuration | Run the complete stack journey, enable Mongo authentication, prove persistence/restore, and add production bootstrap |
 | Kubernetes and Helm | Partial | Strict Helm lint and default/minimal/HA/external-Mongo/air-gap renders pass; public GHCR `edge` manifests resolve anonymously; the web proxy targets the release-qualified server Service; probes, HPA, PDB, topology, bounded writable paths, security contexts, Ingress, and NetworkPolicy render | Run real cluster install/readiness/MCP, migration, scaling, backup/restore, upgrade/rollback, and disconnected tests; production releases must pin immutable digests |
-| Managed cloud deployment | Partial; live release blocked | `apps/managed-cloud`, `@litemcp/managed-cloud`, KV/D1 bindings, local D1 migration, generated Worker types, static assets, apex/`www` custom-domain configuration with canonical redirect, Wrangler dry-run bundle, and inactive-version bootstrap instructions exist | The existing non-interactive Wrangler credential is expired and no API-token environment is set; account resource provisioning, domain deployment, auth/session/API/MCP smoke, rollback, and recorded live acceptance remain |
+| Managed cloud deployment | Partial; public preview live | Wrangler deployed Worker version `519323e3-dbfb-418a-92a4-9aeb16afe973` to [`litemcpcomposer.com`](https://litemcpcomposer.com) with dedicated KV/D1 resources, remote Better Auth migration, secret binding, static assets, TLS, apex and `www` custom domains, canonical 308 redirect, and passing public site/health/readiness/session smoke | First-admin onboarding, privileged auth/control-plane/MCP/audit journey, rollback exercise, serialized mutation authority, SSO/SCIM provider tests, load/security acceptance, and production SLOs remain |
 | Public GitHub repository | Complete | [`reachjalil/liteMCP`](https://github.com/reachjalil/liteMCP) is public, uses `main`, exposes Apache-2.0 metadata, and contains checkpoint `3b3e85c`; private vulnerability reporting is enabled | Continue normal review/release maintenance and add branch rules when the contributor workflow is established |
 
 ## Deployment boundary
@@ -75,6 +75,13 @@ Passed in this snapshot:
 - every workspace build, the thirty-page Astro build, and the managed cloud
   Wrangler `deploy --dry-run` bundle;
 - local D1 Better Auth migration;
+- authenticated Wrangler deployment of Worker version
+  `519323e3-dbfb-418a-92a4-9aeb16afe973`, dedicated KV/D1 provisioning, remote
+  D1 migration, secret binding, apex and `www` custom domains, and public 200
+  smoke checks for the site, docs, login, explainer asset, `/health`, `/ready`,
+  and Better Auth session endpoint; the `www` edge returned a canonical 308 and
+  followed to a 200; live responsive documentation QA passed at 1773px and
+  390px with no sidebar overlap, page overflow, or browser console errors;
 - Dockerfile checks and full server/web image builds;
 - Docker Compose configuration rendering;
 - strict Helm lint and all checked-in example renders;
@@ -88,9 +95,9 @@ Passed in this snapshot:
 
 Not passed or not available:
 
-- authenticated live managed cloud deployment and post-deploy smoke tests; the
-  saved non-interactive Wrangler credential was expired and no Cloudflare API
-  token was present on 2026-07-21;
+- privileged live first-admin/authentication, control-plane, MCP initialize/list/call,
+  audit-correlation, SSO/SCIM, rollback, load, and security acceptance against
+  the managed-cloud preview;
 - kind/Kubernetes runtime smoke (`kubectl` and `kind` were unavailable);
 - live Docker Compose product journey and Mongo backup/restore exercise;
 - live Entra/SCIM/OAuth provider tests, MCP conformance suite, load test, external

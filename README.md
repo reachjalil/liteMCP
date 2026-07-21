@@ -123,10 +123,11 @@ Useful API surfaces:
 
 ### Managed cloud
 
-The managed cloud app currently uses Cloudflare Workers to serve the static
-Astro site and API on one origin. Product records use Workers KV, and Better
-Auth uses D1. Those provider details remain confined to this composition root
-and `packages/adapter-cloudflare`.
+The public managed-cloud preview is live at
+[`litemcpcomposer.com`](https://litemcpcomposer.com). It currently uses
+Cloudflare Workers to serve the static Astro site and API on one origin.
+Product records use Workers KV, and Better Auth uses D1. Those provider details
+remain confined to this composition root and `packages/adapter-cloudflare`.
 
 ```bash
 pnpm --filter @litemcp/managed-cloud db:migrate:local
