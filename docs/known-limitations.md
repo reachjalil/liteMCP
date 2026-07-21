@@ -153,9 +153,11 @@ production-ready enterprise release. This list is intentionally conservative.
 - Tool JSON Schemas use an isolated validator, reject external references, and
   validate standard formats. The supported-schema compatibility surface still
   needs broader fuzzing and resource limits for pathological schemas.
-- No penetration test, external security review, supply-chain incident
-  exercise, signed release, published SBOM, vulnerability scan, or reproducible
-  build proof is recorded.
+- The first GHCR publication produced BuildKit SBOM and provenance attestations
+  for both images, but the packages remain private. No penetration test,
+  external security review, supply-chain incident exercise, signed release,
+  vulnerability scan, anonymous-pull proof, or reproducible build proof is
+  recorded.
 - LiteMCP Composer claims no SOC 2, ISO 27001, HIPAA, FedRAMP, GDPR
   certification, or other certification.
 

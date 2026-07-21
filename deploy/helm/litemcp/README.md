@@ -13,6 +13,11 @@ semantics.
 - An ingress controller when `ingress.enabled=true`
 - metrics-server when either HPA is enabled
 
+The chart currently follows the validated `edge` images in GHCR. At this
+snapshot those packages are published but private, so an installation must set
+`imagePullSecrets` or override both image repositories/tags with images your
+cluster can pull. Production releases should pin immutable digests.
+
 ## Install
 
 Create an operator-managed Secret. The default chart expects both keys in

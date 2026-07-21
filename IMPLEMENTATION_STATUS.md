@@ -19,7 +19,7 @@ code and reproducible evidence.
 | Area | Status | Implemented evidence | What remains |
 | --- | --- | --- | --- |
 | Research and product architecture | Complete | Supplied research inspected; pattern audit, architecture, product, security, identity, policy, parity, and limitation documents are checked in | Revalidate time-sensitive market and standards claims before publication |
-| Workspace and CI foundation | Complete | pnpm/Turbo/strict TypeScript/Biome workspace, frozen lockfile, Apache-2.0 project files, and GitHub Actions format/lint/type/test/build/Compose/Helm/container jobs | Add release, signing, dependency-review, and security-scan workflows |
+| Workspace and CI foundation | Complete | pnpm/Turbo/strict TypeScript/Biome workspace, frozen lockfile, Apache-2.0 project files, and green public CI run [`29804954887`](https://github.com/reachjalil/liteMCP/actions/runs/29804954887) for format/lint/type/test/build/Compose/Helm/containers; current action revisions are full-SHA pinned | Re-run the pinned action revisions remotely; add tagged release, artifact signing, dependency-review, and security-scan workflows |
 | Portable contracts | Partial | Zod domain/API contracts, versioned MCP protocol constant, OpenAPI 3.1 document, and typed SDK surfaces build | Compatibility/version-migration tests and generated-schema drift gate |
 | Product `DocumentStore` | Partial | Portable contract plus memory, Workers KV, and MongoDB adapters; tenant filters, pagination, and revision writes | Durable Object authority, adapter parity tests, transactional outbox, migrations, and failure recovery |
 | Public Astro site | Partial | Thirty-route Astro site, responsive console, generated explainer visuals, metadata, accessibility-conscious markup, and local browser/build QA | Public deployment, formal accessibility/performance audit, content review, and analytics/privacy decision |
@@ -36,9 +36,9 @@ code and reproducible evidence.
 | Audit and observability | Partial | Tenant-scoped redacted hash chain, sequence/CAS retry, execution outcomes, API/UI view, and export | Strong cloud serialization, transactional outbox, signed/external anchor, retention/SIEM, OpenTelemetry, quotas, and dashboards |
 | CLI and SDKs | Partial | Operational CLI, TypeScript SDK, dependency-free Python SDK, and runnable local-composition example | Published-package smoke, full resource coverage, auth flows, stable compatibility policy, and authoring SDK |
 | Docker Compose | Partial | Frozen-lock images build; secret-bearing local files are excluded from build contexts; Compose renders with a runtime-templated same-origin proxy, Mongo replica set, readiness checks, and hardened runtime configuration | Run the complete stack journey, enable Mongo authentication, prove persistence/restore, and add production bootstrap |
-| Kubernetes and Helm | Partial | Strict Helm lint and default/minimal/HA/external-Mongo/air-gap renders pass; the web proxy targets the release-qualified server Service; probes, HPA, PDB, topology, bounded writable paths, security contexts, Ingress, and NetworkPolicy render | Real cluster install/readiness/MCP, migration, scaling, backup/restore, upgrade/rollback, and disconnected tests |
-| Managed cloud deployment | Partial; live release blocked | `apps/managed-cloud`, `@litemcp/managed-cloud`, KV/D1 bindings, local D1 migration, generated Worker types, static assets, Wrangler dry-run bundle, and inactive-version bootstrap instructions exist | Wrangler authentication, account resource provisioning, Durable Object authority, real domain binding/deploy, auth/session/API/MCP smoke, rollback, and recorded URL |
-| Public GitHub repository | Pending publication | Repository contents and public open-source files are prepared locally | Push to the authorized public repository and record remote/visibility evidence |
+| Kubernetes and Helm | Partial | Strict Helm lint and default/minimal/HA/external-Mongo/air-gap renders pass; the web proxy targets the release-qualified server Service; probes, HPA, PDB, topology, bounded writable paths, security contexts, Ingress, and NetworkPolicy render | Make the published GHCR packages anonymously pullable or configure registry credentials, then run real cluster install/readiness/MCP, migration, scaling, backup/restore, upgrade/rollback, and disconnected tests |
+| Managed cloud deployment | Partial; live release blocked | `apps/managed-cloud`, `@litemcp/managed-cloud`, KV/D1 bindings, local D1 migration, generated Worker types, static assets, apex/`www` custom-domain configuration with canonical redirect, Wrangler dry-run bundle, and inactive-version bootstrap instructions exist | The existing non-interactive Wrangler credential is expired and no API-token environment is set; account resource provisioning, domain deployment, auth/session/API/MCP smoke, rollback, and recorded live acceptance remain |
+| Public GitHub repository | Complete | [`reachjalil/liteMCP`](https://github.com/reachjalil/liteMCP) is public, uses `main`, exposes Apache-2.0 metadata, and contains checkpoint `3b3e85c`; private vulnerability reporting is enabled | Continue normal review/release maintenance and add branch rules when the contributor workflow is established |
 
 ## Deployment boundary
 
@@ -69,24 +69,32 @@ Passed in this snapshot:
 
 - `pnpm install --frozen-lockfile`;
 - `pnpm format:check`, `pnpm lint`, and repository-wide strict type checks;
-- package unit/integration tests, including policy conflicts, tenant/RBAC
-  boundaries, MCP arguments, revocation, and Node DNS-pinned egress;
+- 69 package unit/integration tests across 11 test files, including policy
+  conflicts, tenant/RBAC boundaries, MCP arguments, revocation, canonical
+  domain handling, and Node DNS-pinned egress;
 - every workspace build, the thirty-page Astro build, and the managed cloud
   Wrangler `deploy --dry-run` bundle;
 - local D1 Better Auth migration;
 - Dockerfile checks and full server/web image builds;
 - Docker Compose configuration rendering;
 - strict Helm lint and all checked-in example renders;
-- shell syntax, Python bytecode compilation, and local browser QA.
+- shell syntax, Python bytecode compilation, and local browser QA;
+- public GitHub Actions run [`29804954887`](https://github.com/reachjalil/liteMCP/actions/runs/29804954887),
+  including both container builds; and
+- container publication run [`29805072894`](https://github.com/reachjalil/liteMCP/actions/runs/29805072894),
+  which published server and web `edge` images with BuildKit SBOM and provenance
+  attestations. The packages are currently private.
 
 Not passed or not available:
 
-- authenticated live managed cloud deployment and post-deploy smoke tests;
+- authenticated live managed cloud deployment and post-deploy smoke tests; the
+  saved non-interactive Wrangler credential was expired and no Cloudflare API
+  token was present on 2026-07-21;
 - kind/Kubernetes runtime smoke (`kubectl` and `kind` were unavailable);
 - live Docker Compose product journey and Mongo backup/restore exercise;
 - live Entra/SCIM/OAuth provider tests, MCP conformance suite, load test, external
-  security assessment, container vulnerability scan, SBOM/signing, and
-  release-reproducibility proof.
+  security assessment, container vulnerability scan, artifact signing,
+  anonymous container pulls, and release-reproducibility proof.
 
 See [`docs/known-limitations.md`](./docs/known-limitations.md) for the security
 and commercial boundaries behind these statuses.
