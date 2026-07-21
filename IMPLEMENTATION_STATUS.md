@@ -19,7 +19,7 @@ code and reproducible evidence.
 | Area | Status | Implemented evidence | What remains |
 | --- | --- | --- | --- |
 | Research and product architecture | Complete | Supplied research inspected; pattern audit, architecture, product, security, identity, policy, parity, and limitation documents are checked in | Revalidate time-sensitive market and standards claims before publication |
-| Workspace and CI foundation | Complete | pnpm/Turbo/strict TypeScript/Biome workspace, frozen lockfile, Apache-2.0 project files, and green public CI run [`29804954887`](https://github.com/reachjalil/liteMCP/actions/runs/29804954887) for format/lint/type/test/build/Compose/Helm/containers; current action revisions are full-SHA pinned | Re-run the pinned action revisions remotely; add tagged release, artifact signing, dependency-review, and security-scan workflows |
+| Workspace and CI foundation | Complete | pnpm/Turbo/strict TypeScript/Biome workspace, frozen lockfile, Apache-2.0 project files, and green public CI run [`29805311450`](https://github.com/reachjalil/liteMCP/actions/runs/29805311450) for format/lint/type/test/build/Compose/Helm/containers using current full-SHA-pinned action revisions | Add tagged release, artifact signing, dependency-review, and security-scan workflows |
 | Portable contracts | Partial | Zod domain/API contracts, versioned MCP protocol constant, OpenAPI 3.1 document, and typed SDK surfaces build | Compatibility/version-migration tests and generated-schema drift gate |
 | Product `DocumentStore` | Partial | Portable contract plus memory, Workers KV, and MongoDB adapters; tenant filters, pagination, and revision writes | Durable Object authority, adapter parity tests, transactional outbox, migrations, and failure recovery |
 | Public Astro site | Partial | Thirty-route Astro site, responsive console, generated explainer visuals, metadata, accessibility-conscious markup, and local browser/build QA | Public deployment, formal accessibility/performance audit, content review, and analytics/privacy decision |
@@ -36,7 +36,7 @@ code and reproducible evidence.
 | Audit and observability | Partial | Tenant-scoped redacted hash chain, sequence/CAS retry, execution outcomes, API/UI view, and export | Strong cloud serialization, transactional outbox, signed/external anchor, retention/SIEM, OpenTelemetry, quotas, and dashboards |
 | CLI and SDKs | Partial | Operational CLI, TypeScript SDK, dependency-free Python SDK, and runnable local-composition example | Published-package smoke, full resource coverage, auth flows, stable compatibility policy, and authoring SDK |
 | Docker Compose | Partial | Frozen-lock images build; secret-bearing local files are excluded from build contexts; Compose renders with a runtime-templated same-origin proxy, Mongo replica set, readiness checks, and hardened runtime configuration | Run the complete stack journey, enable Mongo authentication, prove persistence/restore, and add production bootstrap |
-| Kubernetes and Helm | Partial | Strict Helm lint and default/minimal/HA/external-Mongo/air-gap renders pass; the web proxy targets the release-qualified server Service; probes, HPA, PDB, topology, bounded writable paths, security contexts, Ingress, and NetworkPolicy render | Make the published GHCR packages anonymously pullable or configure registry credentials, then run real cluster install/readiness/MCP, migration, scaling, backup/restore, upgrade/rollback, and disconnected tests |
+| Kubernetes and Helm | Partial | Strict Helm lint and default/minimal/HA/external-Mongo/air-gap renders pass; public GHCR `edge` manifests resolve anonymously; the web proxy targets the release-qualified server Service; probes, HPA, PDB, topology, bounded writable paths, security contexts, Ingress, and NetworkPolicy render | Run real cluster install/readiness/MCP, migration, scaling, backup/restore, upgrade/rollback, and disconnected tests; production releases must pin immutable digests |
 | Managed cloud deployment | Partial; live release blocked | `apps/managed-cloud`, `@litemcp/managed-cloud`, KV/D1 bindings, local D1 migration, generated Worker types, static assets, apex/`www` custom-domain configuration with canonical redirect, Wrangler dry-run bundle, and inactive-version bootstrap instructions exist | The existing non-interactive Wrangler credential is expired and no API-token environment is set; account resource provisioning, domain deployment, auth/session/API/MCP smoke, rollback, and recorded live acceptance remain |
 | Public GitHub repository | Complete | [`reachjalil/liteMCP`](https://github.com/reachjalil/liteMCP) is public, uses `main`, exposes Apache-2.0 metadata, and contains checkpoint `3b3e85c`; private vulnerability reporting is enabled | Continue normal review/release maintenance and add branch rules when the contributor workflow is established |
 
@@ -79,11 +79,12 @@ Passed in this snapshot:
 - Docker Compose configuration rendering;
 - strict Helm lint and all checked-in example renders;
 - shell syntax, Python bytecode compilation, and local browser QA;
-- public GitHub Actions run [`29804954887`](https://github.com/reachjalil/liteMCP/actions/runs/29804954887),
+- public GitHub Actions run [`29805311450`](https://github.com/reachjalil/liteMCP/actions/runs/29805311450),
   including both container builds; and
-- container publication run [`29805072894`](https://github.com/reachjalil/liteMCP/actions/runs/29805072894),
+- container publication run [`29805372196`](https://github.com/reachjalil/liteMCP/actions/runs/29805372196),
   which published server and web `edge` images with BuildKit SBOM and provenance
-  attestations. The packages are currently private.
+  attestations; both OCI indexes resolve anonymously from a clean Docker
+  credential directory.
 
 Not passed or not available:
 
@@ -94,7 +95,7 @@ Not passed or not available:
 - live Docker Compose product journey and Mongo backup/restore exercise;
 - live Entra/SCIM/OAuth provider tests, MCP conformance suite, load test, external
   security assessment, container vulnerability scan, artifact signing,
-  anonymous container pulls, and release-reproducibility proof.
+  tagged immutable container release, and release-reproducibility proof.
 
 See [`docs/known-limitations.md`](./docs/known-limitations.md) for the security
 and commercial boundaries behind these statuses.
