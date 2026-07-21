@@ -1,0 +1,32 @@
+---
+type Props = {
+  eyebrow: string;
+  title: string;
+  description: string;
+  signal?: string;
+  compact?: boolean;
+};
+
+const { eyebrow, title, description, signal, compact = false } = Astro.props;
+---
+
+<section class:list={["page-hero", compact && "page-hero--compact"]}>
+  <div class="shell page-hero__grid">
+    <div class="page-hero__copy">
+      <p class="eyebrow">{eyebrow}</p>
+      <h1>{title}</h1>
+      <p class="page-hero__description">{description}</p>
+      <div class="page-hero__actions">
+        <slot name="actions" />
+      </div>
+    </div>
+    {signal ? (
+      <aside class="page-hero__signal" aria-label="Key product principle">
+        <span>Operating principle</span>
+        <strong>{signal}</strong>
+        <div class="page-hero__signal-rule" aria-hidden="true"></div>
+        <small>Explicit configuration · explainable decisions · portable deployment</small>
+      </aside>
+    ) : null}
+  </div>
+</section>

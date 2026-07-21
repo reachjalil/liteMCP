@@ -1,0 +1,108 @@
+name: litemcp
+
+services:
+  mongodb:
+    image: mongo:8.0
+    command:
+      - mongod
+      - --bind_ip_all
+      - --replSet
+      - rs0
+    restart: unless-stopped
+    stop_grace_period: 30s
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --host 127.0.0.1:27017 --quiet --eval
+          'try { rs.status().ok } catch (error) {
+          rs.initiate({_id:"rs0",members:[{_id:0,host:"mongodb:27017"}]}).ok }'
+          | grep -q 1
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - backend
+
+  server:
+    image: ghcr.io/reachjalil/litemcp-server:${LITEMCP_VERSION:-local}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/server.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      API_ORIGIN: ${API_ORIGIN:-http://localhost:8787}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:8080}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in deploy/docker-compose/.env}
+      HOST: 0.0.0.0
+      LITEMCP_DEMO_MODE: "false"
+      MONGODB_DATABASE: litemcp
+      MONGODB_URI: mongodb://mongodb:27017/litemcp?replicaSet=rs0
+      NODE_ENV: production
+      PORT: "8787"
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:8080}
+    ports:
+      - "${SERVER_PORT:-8787}:8787"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch('http://127.0.0.1:8787/ready').then((response) => {
+          if (!response.ok) process.exit(1); }).catch(() => process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - backend
+      - frontend
+
+  web:
+    image: ghcr.io/reachjalil/litemcp-web:${LITEMCP_VERSION:-local}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/web.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      API_UPSTREAM: http://server:8787
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    healthcheck:
+      test: [CMD, wget, --quiet, --tries=1, --spider, http://127.0.0.1:8080/health]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+      - /etc/nginx/conf.d:size=1m,uid=101,gid=101
+      - /var/cache/nginx:size=32m,uid=101,gid=101
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - frontend
+
+networks:
+  backend:
+    internal: true
+  frontend: {}
+
+volumes:
+  mongodb-data:

@@ -1,0 +1,34 @@
+{
+  "name": "@litemcp/managed-cloud",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "auth:schema": "tsx scripts/print-auth-migration.ts",
+    "build": "pnpm --filter @litemcp/web build && wrangler deploy --dry-run --outdir dist",
+    "db:migrate:local": "wrangler d1 migrations apply AUTH_DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply AUTH_DB --remote",
+    "dev": "pnpm --filter @litemcp/web build && wrangler dev",
+    "deploy": "pnpm --filter @litemcp/web build && wrangler deploy",
+    "test": "vitest run --passWithNoTests",
+    "types": "tsc -p tsconfig.json && wrangler types worker-configuration.d.ts"
+  },
+  "dependencies": {
+    "@litemcp/adapter-cloudflare": "workspace:*",
+    "@litemcp/auth": "workspace:*",
+    "@litemcp/core": "workspace:*",
+    "@litemcp/mcp-gateway": "workspace:*",
+    "@litemcp/platform-api": "workspace:*",
+    "better-auth": "catalog:",
+    "hono": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@litemcp/web": "workspace:*",
+    "typescript": "catalog:",
+    "tsx": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

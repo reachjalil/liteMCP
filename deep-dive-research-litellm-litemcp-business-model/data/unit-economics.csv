@@ -1,0 +1,11 @@
+metric,value,unit,status,notes
+successful_execution,0.00003,USD,assumption,routing compute/network/telemetry
+active_managed_connection,0.05,USD per month,assumption,vault operations and refresh
+metadata_storage_allowance,15,USD per Growth customer month,assumption,compressed metadata/egress/monitoring
+sandbox_compute_markup,25,percent,proposal,separate pass-through meter
+connector_engineer_hour,150,USD fully-loaded,assumption,sensitivity input
+growth_subscription,399,USD per month,proposal,2M executions + 500 connections
+growth_execution_cost_at_allowance,60,USD per month,derived,2M × 0.00003
+growth_connection_cost_at_allowance,25,USD per month,derived,500 × 0.05
+growth_infra_subtotal,100,USD per month,derived/rounded,includes 15 storage allowance
+growth_infra_gross_margin,74.94,percent,derived,before support/connector operations

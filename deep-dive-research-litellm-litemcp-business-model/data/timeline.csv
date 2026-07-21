@@ -1,0 +1,12 @@
+date,event,date_precision,evidence_keys,implication
+2023-01-01,LiteLLM open-source era begins,approximate-year,S-005;S-006,Permissive distribution
+2023-01-01,LiteLLM YC W23,cohort,S-010,Company formation signal
+2024-01-01,LiteLLM enterprise commercial license era,approximate-year,S-007;S-008,Open-core boundary
+2025-03-21,Existing litemcp PyPI release,exact,S-050,Name collision
+2025-09-08,Official MCP Registry preview,exact,S-038,Discovery infrastructure
+2025-11-25,Stable MCP specification revision,exact,S-034,Conformance baseline
+2026-03-24,LiteLLM malicious PyPI versions discovered/contained,exact,S-016;S-017,Supply-chain trust
+2026-05-21,Composio GitHub connections degraded,exact,S-033,Connector-specific availability
+2026-06-29,LiteLLM four-minor support policy effective,exact,S-003,No LTS
+2026-07-20,Research snapshot,exact,S-001,Decision date
+2026-08-15,Announced Composio pricing change,future-announced,S-025,Recheck price

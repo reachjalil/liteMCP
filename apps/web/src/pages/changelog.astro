@@ -1,0 +1,47 @@
+---
+import PageHero from "../components/PageHero.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+---
+
+<SiteLayout title="Changelog" description="LiteMCP Composer unreleased repository history and intended edge, stable, and LTS release-channel policy.">
+  <PageHero
+    eyebrow="Changelog"
+    title="Release changes will carry operational context."
+    description="Every release line is intended to publish compatibility scope, migrations, security notes, signed artifacts, and rollback instructions."
+    signal="No silent breaking changes"
+    compact
+  />
+
+  <section class="content-section">
+    <div class="shell split-layout">
+      <div class="split-layout__aside">
+        <p class="eyebrow">Release channels</p>
+        <h2>Different velocity, explicit support.</h2>
+        <a class="text-link" href="https://github.com/reachjalil/liteMCP/blob/main/docs/release-and-lts-policy.md">Read the release and LTS policy <span aria-hidden="true">↗</span></a>
+      </div>
+      <dl class="definition-grid">
+        <dt>edge</dt><dd>Planned channel for rapid protocol, client, and connector compatibility work.</dd>
+        <dt>stable</dt><dd>Planned channel for tested releases with migration and rollback notes.</dd>
+        <dt>lts</dt><dd>Planned long-term lines for predictable security and compatibility maintenance. Dates are not yet announced.</dd>
+        <dt>connectors</dt><dd>Connector artifacts may release independently from the gateway binary when compatibility changes.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section class="content-section content-section--subtle">
+    <div class="shell">
+      <ul class="timeline">
+        <li>
+          <time datetime="2026-07-21">2026-07-21</time>
+          <div><h2>Repository foundation</h2><p>Initial open-source monorepo, typed contracts, portable service boundary, public site, management console, and deployment assets under active construction.</p></div>
+          <span class="timeline__tag">unreleased</span>
+        </li>
+        <li>
+          <time>Next</time>
+          <div><h2>Alpha validation</h2><p>Protocol compatibility, identity threat model, migration tests, signed artifacts, and first design-partner gateway runs.</p></div>
+          <span class="timeline__tag">planned</span>
+        </li>
+      </ul>
+    </div>
+  </section>
+</SiteLayout>

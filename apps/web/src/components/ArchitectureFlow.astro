@@ -1,0 +1,39 @@
+---
+import { platformLayers } from "../content/site";
+
+type Props = {
+  endpointLabel?: string;
+};
+
+const { endpointLabel = "mcp.company.example" } = Astro.props;
+---
+
+<div class="architecture" role="img" aria-label="Clients connect through one governed endpoint to composed MCP servers">
+  <div class="architecture__clients">
+    <span>Codex</span>
+    <span>Claude</span>
+    <span>IDE</span>
+    <span>Agent</span>
+  </div>
+  <div class="architecture__line" aria-hidden="true"></div>
+  <div class="architecture__endpoint">
+    <span>One endpoint</span>
+    <code>{endpointLabel}</code>
+  </div>
+  <div class="architecture__layers">
+    {platformLayers.map((layer) => (
+      <div>
+        <span>{layer.index}</span>
+        <strong>{layer.title}</strong>
+        <small>{layer.detail}</small>
+      </div>
+    ))}
+  </div>
+  <div class="architecture__line" aria-hidden="true"></div>
+  <div class="architecture__upstreams">
+    <span>Remote HTTP</span>
+    <span>Local stdio</span>
+    <span>Container</span>
+    <span>OpenAPI</span>
+  </div>
+</div>

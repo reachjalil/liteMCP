@@ -1,0 +1,69 @@
+---
+import PageHero from "../components/PageHero.astro";
+import SectionHeader from "../components/SectionHeader.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+---
+
+<SiteLayout title="Managed cloud" description="Inspect the LiteMCP Composer managed cloud deployment preview, currently implemented with Cloudflare infrastructure and not yet released as a public operated service.">
+  <PageHero
+    eyebrow="Managed cloud · Preview"
+    title="The managed cloud target is open and buildable."
+    description="The Cloudflare-backed Worker bundle, storage adapters, authentication migration, and static site build locally. No authenticated public deployment or operated-service availability is claimed yet."
+    signal="Source preview, not a live service"
+  >
+    <Fragment slot="actions">
+      <a class="button button--primary button--large" href="/app">Open the local console</a>
+      <a class="button button--large" href="/pricing">Compare distributions</a>
+    </Fragment>
+  </PageHero>
+
+  <section class="content-section">
+    <div class="shell">
+      <SectionHeader
+        eyebrow="Intended managed cloud contract"
+        title="Convenience without a closed product fork."
+        description="When the service becomes available, it is intended to operate the same open capability maturity as self-hosting and publish limits that protect shared infrastructure."
+      />
+      <div class="two-column-cards">
+        <article>
+          <p class="eyebrow">Preview</p>
+          <h2>The current management slice</h2>
+          <p>Server registration, composition creation, scoped sessions, policy simulation, approval records, audit, and export are present at preview maturity.</p>
+        </article>
+        <article>
+          <p class="eyebrow">Preview</p>
+          <h2>Portable package boundary</h2>
+          <p>Configuration export and shared packages exist. A live import and execution test from managed cloud to Kubernetes has not yet passed.</p>
+        </article>
+        <article>
+          <p class="eyebrow">Planned</p>
+          <h2>Limits will be published</h2>
+          <p>Request, concurrency, storage, and abuse controls will be documented before general availability. No limits are claimed here before they are set.</p>
+        </article>
+        <article>
+          <p class="eyebrow">Product commitment</p>
+          <h2>Metadata-first operations</h2>
+          <p>Service telemetry should not require tool arguments, tool responses, access tokens, or provider secrets.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section content-section--subtle">
+    <div class="shell split-layout">
+      <div class="split-layout__aside">
+        <p class="eyebrow">Current status</p>
+        <h2>Build validation exists; release proof does not.</h2>
+        <p>
+          Wrangler dry-run bundling and the local D1 migration pass. Wrangler was not authenticated,
+          no service was deployed, and no live authentication, API, MCP, or rollback smoke test ran.
+        </p>
+      </div>
+      <div class="legal-note">
+        The current KV product-state adapter is eventually consistent and evaluation-grade for
+        security-sensitive state. Availability, regional placement, fair-use thresholds, durability,
+        and support targets remain unpublished.
+      </div>
+    </div>
+  </section>
+</SiteLayout>

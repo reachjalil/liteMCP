@@ -1,0 +1,60 @@
+---
+import { documentationReferences } from "../content/docs";
+import SiteLayout from "./SiteLayout.astro";
+
+type Props = {
+  title: string;
+  description: string;
+  currentPath: string;
+  eyebrow?: string;
+};
+
+const { title, description, currentPath, eyebrow = "Documentation" } = Astro.props;
+const links = [
+  ["Documentation home", "/docs"],
+  ["Getting started", "/docs/getting-started"],
+  ["Self-hosting", "/docs/self-hosting"],
+] as const;
+---
+
+<SiteLayout title={title} description={description}>
+  <div class="doc-shell">
+    <aside class="doc-sidebar">
+      <h2>Start</h2>
+      <nav aria-label="Documentation navigation">
+        {links.map(([label, href]) => (
+          <a href={href} aria-current={currentPath === href ? "page" : undefined}>{label}</a>
+        ))}
+      </nav>
+      <h2>Reference</h2>
+      <nav aria-label="Reference navigation">
+        {documentationReferences.map((reference) => (
+          <a
+            href={`/docs/reference/${reference.slug}`}
+            aria-current={currentPath === `/docs/reference/${reference.slug}` ? "page" : undefined}
+          >
+            {reference.shortTitle}
+          </a>
+        ))}
+      </nav>
+      <h2>Product</h2>
+      <nav aria-label="Product navigation">
+        <a href="/product/composer">Composition</a>
+        <a href="/product/identity">Identity</a>
+        <a href="/product/policy">Policy</a>
+        <a href="/product/routing">Routing</a>
+        <a href="/security">Security</a>
+      </nav>
+    </aside>
+    <article class="doc-content">
+      <header class="doc-content__header">
+        <p class="eyebrow">{eyebrow}</p>
+        <h1>{title}</h1>
+        <p>{description}</p>
+      </header>
+      <div class="prose">
+        <slot />
+      </div>
+    </article>
+  </div>
+</SiteLayout>

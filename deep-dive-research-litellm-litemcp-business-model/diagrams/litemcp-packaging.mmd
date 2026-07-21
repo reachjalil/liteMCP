@@ -1,0 +1,14 @@
+flowchart TB
+  CORE[Community Core
+  Apache-2.0
+  gateway, transports, policy, local auth, OTel, export]
+  CLOUD[Cloud
+  managed gateways, token broker, verified registry, dashboards]
+  ASSURE[Connector Assurance
+  signed builds, tests, repair objective, CVE/deprecation feed]
+  ENT[Enterprise
+  SSO/SCIM, approvals, BYOK, SIEM, VPC/self-host, HA, SLA]
+
+  CORE --> CLOUD
+  CLOUD --> ASSURE
+  ASSURE --> ENT

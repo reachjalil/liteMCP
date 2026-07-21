@@ -1,0 +1,46 @@
+{
+  "name": "litemcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "One governed MCP endpoint for every user and agent.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.30.2",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "check": "pnpm format:check && pnpm lint && pnpm types && pnpm test && pnpm build",
+    "dev": "PUBLIC_API_ORIGIN=http://localhost:8787 pnpm --parallel --filter @litemcp/server --filter @litemcp/web dev",
+    "dev:server": "pnpm --filter @litemcp/server dev",
+    "dev:web": "pnpm --filter @litemcp/web dev",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "test": "turbo run test",
+    "test:coverage": "turbo run test:coverage",
+    "types": "turbo run types",
+    "managed-cloud:dev": "pnpm --filter @litemcp/managed-cloud dev",
+    "managed-cloud:deploy": "pnpm --filter @litemcp/managed-cloud deploy",
+    "docker:up": "docker compose -f deploy/docker-compose/compose.yaml up --build",
+    "docker:down": "docker compose -f deploy/docker-compose/compose.yaml down",
+    "helm:lint": "helm lint --strict deploy/helm/litemcp",
+    "helm:template": "helm template litemcp deploy/helm/litemcp"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@types/node": "catalog:",
+    "turbo": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "workerd"
+    ]
+  }
+}

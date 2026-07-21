@@ -1,0 +1,93 @@
+---
+import DocPageLayout from "../../layouts/DocPageLayout.astro";
+---
+
+<DocPageLayout
+  title="Self-hosting and Kubernetes"
+  description="Evaluate LiteMCP Composer locally, then inspect the production-oriented Helm target. A live Kubernetes product journey has not yet passed."
+  currentPath="/docs/self-hosting"
+>
+  <div class="callout">
+    <strong>Self-hosted preview</strong>
+    <p>Images build and Helm profiles lint/render without a managed cloud dependency. No live cluster install, readiness, MCP, recovery, upgrade, or disconnected test has passed yet.</p>
+  </div>
+
+  <h2 id="topology">Production-oriented target topology</h2>
+  <p>The target separates these responsibilities. Status describes the current repository evidence:</p>
+  <table>
+    <thead><tr><th>Component</th><th>Responsibility</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>Web</td><td>Astro management and documentation surface</td><td>Available now</td></tr>
+      <tr><td>Control plane</td><td>Registry, composition, identity, policy, sessions, audit, and OpenAPI</td><td>Preview</td></tr>
+      <tr><td>Gateway</td><td>Streamable HTTP tools, discovery filtering, policy recheck, and upstream execution</td><td>Preview</td></tr>
+      <tr><td>MongoDB</td><td>Tenant-scoped control-plane records and audit metadata</td><td>Preview</td></tr>
+      <tr><td>Secret provider</td><td>Envelope keys and durable upstream credentials</td><td>Planned</td></tr>
+      <tr><td>Telemetry stack</td><td>OpenTelemetry traces, metrics, logs, and SIEM export</td><td>Planned</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="compose">Docker Compose evaluation</h2>
+  <pre><code>cp deploy/docker-compose/.env.example deploy/docker-compose/.env
+# Replace BETTER_AUTH_SECRET in the copied file.
+pnpm docker:up</code></pre>
+  <p>
+    The evaluation topology is not a substitute for production secret management, backups,
+    network policy, or high availability.
+  </p>
+
+  <h2 id="preflight">Preflight for Kubernetes</h2>
+  <p>Before treating a future release as production-ready, validate:</p>
+  <ul>
+    <li>Ingress hostnames, TLS certificates, and trusted proxy headers</li>
+    <li>Replica-set connectivity, authentication, storage class, and backup target</li>
+    <li>Secret references, KMS or Vault access, and key-rotation ownership</li>
+    <li>OIDC/SAML redirect URIs, issuer reachability, and SCIM credentials</li>
+    <li>Network policies and approved upstream egress</li>
+    <li>OpenTelemetry collector and SIEM delivery</li>
+  </ul>
+
+  <h2 id="helm">Render and install the Helm chart</h2>
+  <p>
+    The lint and template steps are validated. The install command is an operator preview and has
+    not been exercised against a live cluster in this repository snapshot.
+  </p>
+  <pre><code>helm lint deploy/helm/litemcp
+helm template litemcp deploy/helm/litemcp \
+  --namespace litemcp \
+  --values values.production.yaml
+
+helm upgrade --install litemcp deploy/helm/litemcp \
+  --namespace litemcp \
+  --create-namespace \
+  --values values.production.yaml \
+  --atomic \
+  --timeout 10m</code></pre>
+  <p>
+    Keep secrets out of the values file. Reference Kubernetes Secrets or an external secret
+    operator backed by your vault or KMS.
+  </p>
+
+  <h2 id="operations">Required operating routines</h2>
+  <ul>
+    <li>Test database and credential-metadata backups on a schedule.</li>
+    <li>Practice restore into an isolated namespace and verify audit-chain continuity.</li>
+    <li>Render every upgrade, inspect migrations, and preserve rollback artifacts.</li>
+    <li>Rotate session, service, and credential-encryption keys with overlapping validity.</li>
+    <li>Collect diagnostics without tool arguments, tool results, tokens, or provider secrets.</li>
+  </ul>
+
+  <h2 id="air-gap">Restricted and air-gapped environments</h2>
+  <p>
+    The intended release process mirrors pinned container images, Helm charts, SBOMs, signatures,
+    and release manifests into an approved internal registry. Signed release artifacts do not yet
+    exist, and no disconnected test has passed. Connector packages that need internet APIs remain
+    subject to the environment's approved routes.
+  </p>
+
+  <h2 id="support">Operational support</h2>
+  <p>
+    The software and deployment assets remain free. <a href="/enterprise">Planned enterprise
+    services</a> may later provide architecture review, installation, migrations, LTS planning,
+    recovery exercises, security response, and agreed support terms. No SLA is published today.
+  </p>
+</DocPageLayout>

@@ -1,0 +1,32 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "litemcp.server.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "litemcp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "litemcp.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8787
+      {{- with .Values.networkPolicy.ingressFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.networkPolicy.serverEgress }}
+  egress:
+    {{- toYaml .Values.networkPolicy.serverEgress | nindent 4 }}
+  {{- else }}
+  egress: []
+  {{- end }}
+{{- end }}

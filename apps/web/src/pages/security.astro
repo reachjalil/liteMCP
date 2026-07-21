@@ -1,0 +1,88 @@
+---
+import PageHero from "../components/PageHero.astro";
+import SectionHeader from "../components/SectionHeader.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+
+const boundaries = [
+  [
+    "Tenant boundary · Available now",
+    "Every management request resolves a tenant on the server; tenant-scoped repositories enforce it again.",
+  ],
+  [
+    "Identity boundary · Preview",
+    "Gateway sessions bind the authenticated subject, organization, composition, environment, expiry, and revocation state. Client hints are not yet a cryptographic binding.",
+  ],
+  [
+    "Discovery boundary · Available now",
+    "Policy removes capabilities the current principal is not allowed to discover.",
+  ],
+  [
+    "Execution boundary · Preview",
+    "The gateway re-evaluates policy and approval state before every upstream invocation.",
+  ],
+  [
+    "Credential boundary · Planned",
+    "The planned broker will issue short-lived execution material without exposing durable provider secrets. Connected accounts and the credential vault are not implemented.",
+  ],
+  [
+    "Network boundary · Preview",
+    "The Node executor pins validated public addresses and bounds HTTP behavior. Equivalent managed cloud egress proof and isolated stdio execution remain outstanding.",
+  ],
+];
+---
+
+<SiteLayout title="Security" description="LiteMCP Composer security and trust center: tenant isolation, identity, policy enforcement, credential boundaries, audit, and vulnerability reporting.">
+  <PageHero
+    eyebrow="Security and trust"
+    title="Treat every MCP server as a trust boundary."
+    description="LiteMCP Composer is designed around least privilege, explicit identity, policy at discovery and execution, credential isolation, request correlation, and portable audit evidence."
+    signal="Current controls and target boundaries labeled"
+  >
+    <Fragment slot="actions">
+      <a class="button button--primary button--large" href="https://github.com/reachjalil/liteMCP/security/advisories/new">Report a vulnerability</a>
+      <a class="button button--large" href="/docs/self-hosting">Deployment controls</a>
+    </Fragment>
+  </PageHero>
+
+  <section class="content-section">
+    <div class="shell">
+      <SectionHeader eyebrow="Enforcement boundaries" title="Defense is repeated, not implied." />
+      <div class="feature-grid">
+        {boundaries.map(([title, description], index) => (
+          <article class="feature-card">
+            <span class="feature-card__index">{String(index + 1).padStart(2, "0")}</span>
+            <h3>{title}</h3>
+            <p>{description}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section content-section--subtle">
+    <div class="shell split-layout">
+      <div class="split-layout__aside">
+        <p class="eyebrow">Responsible disclosure</p>
+        <h2>Report privately. Patch publicly.</h2>
+        <p>
+          Use <a href="https://github.com/reachjalil/liteMCP/security/advisories/new">GitHub private vulnerability reporting</a>.
+          Include affected versions, reproduction detail, impact, and a safe contact channel.
+        </p>
+      </div>
+      <dl class="definition-grid">
+        <dt>Acknowledgement</dt><dd>A response target has not yet been contractually published.</dd>
+        <dt>Coordination</dt><dd>Reports should remain private until a fix and advisory can be coordinated.</dd>
+        <dt>Advisories</dt><dd>Confirmed issues will use public security advisories and affected-version guidance.</dd>
+        <dt>Certifications</dt><dd>No certification, audit completion, or compliance attestation is claimed at this stage.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section class="content-section content-section--tight">
+    <div class="shell legal-note">
+      This trust center describes product design intent and current public commitments. It is not
+      a certification report, penetration-test claim, contractual control description, or legal
+      warranty.
+    </div>
+  </section>
+</SiteLayout>

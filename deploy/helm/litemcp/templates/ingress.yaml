@@ -1,0 +1,44 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "litemcp.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "litemcp.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                {{- if eq .service "server" }}
+                name: {{ include "litemcp.server.fullname" $ }}
+                port:
+                  number: {{ $.Values.server.service.port }}
+                {{- else if eq .service "web" }}
+                name: {{ include "litemcp.web.fullname" $ }}
+                port:
+                  number: {{ $.Values.web.service.port }}
+                {{- else }}
+                {{- fail (printf "ingress path service must be server or web, got %q" .service) }}
+                {{- end }}
+          {{- end }}
+    {{- end }}
+{{- end }}

@@ -1,0 +1,56 @@
+---
+import { documentationReferences, documentationSourceUrl } from "../../../content/docs";
+import DocPageLayout from "../../../layouts/DocPageLayout.astro";
+
+export const getStaticPaths = () =>
+  documentationReferences.map((reference) => ({
+    params: { slug: reference.slug },
+    props: { reference },
+  }));
+
+const { reference } = Astro.props;
+const currentPath = `/docs/reference/${reference.slug}`;
+const sourceUrl = documentationSourceUrl(reference.repositoryPath);
+---
+
+<DocPageLayout
+  title={reference.title}
+  description={reference.description}
+  currentPath={currentPath}
+  eyebrow="Repository reference"
+>
+  <div class="callout">
+    <strong>Evidence boundary</strong>
+    <p>{reference.boundary}</p>
+  </div>
+
+  <h2 id="use-this-reference">Use this reference when</h2>
+  <ul>
+    {reference.useWhen.map((item) => <li>{item}</li>)}
+  </ul>
+
+  <h2 id="coverage">What it covers</h2>
+  <div class="two-column-cards">
+    {reference.sections.map((section) => (
+      <article>
+        <h3>{section.title}</h3>
+        <p>{section.description}</p>
+      </article>
+    ))}
+  </div>
+
+  <h2 id="full-reference">Read the full repository reference</h2>
+  <p>
+    This page is a discovery map, not a shortened replacement for the maintained source. The
+    complete reference includes exact tables, commands, boundaries, and cross-links in{" "}
+    <code>{reference.repositoryPath}</code>.
+  </p>
+  <p>
+    <a class="button button--primary" href={sourceUrl}>Open the complete Markdown reference ↗</a>
+  </p>
+
+  <h2 id="related">Related guides</h2>
+  <ul>
+    {reference.related.map((link) => <li><a href={link.href}>{link.label}</a></li>)}
+  </ul>
+</DocPageLayout>

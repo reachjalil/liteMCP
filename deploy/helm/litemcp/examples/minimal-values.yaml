@@ -1,0 +1,27 @@
+# Single-replica evaluation profile. Create the referenced Secret before install.
+server:
+  replicaCount: 1
+
+web:
+  replicaCount: 1
+
+podDisruptionBudget:
+  server:
+    enabled: false
+  web:
+    enabled: false
+
+networkPolicy:
+  enabled: false
+
+config:
+  webOrigin: http://localhost:8080
+  apiOrigin: http://localhost:8787
+
+mongodb:
+  existingSecret: litemcp-secrets
+  key: MONGODB_URI
+
+auth:
+  existingSecret: litemcp-secrets
+  key: BETTER_AUTH_SECRET

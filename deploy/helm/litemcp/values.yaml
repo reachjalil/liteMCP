@@ -1,0 +1,352 @@
+# Default values are safe for rendering and expect an operator-managed Secret.
+# See README.md and examples/ for install profiles.
+
+nameOverride: ""
+fullnameOverride: ""
+
+commonLabels: {}
+
+imagePullSecrets: []
+
+image:
+  server:
+    repository: ghcr.io/reachjalil/litemcp-server
+    # `edge` follows validated main builds. Production operators should pin a
+    # published release tag or digest once the pre-1.0 release workflow exists.
+    tag: edge
+    digest: ""
+    pullPolicy: IfNotPresent
+  web:
+    repository: ghcr.io/reachjalil/litemcp-web
+    tag: edge
+    digest: ""
+    pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automountServiceAccountToken: false
+
+# Non-sensitive runtime configuration. When create=false, existingConfigMap
+# must contain WEB_ORIGIN and API_ORIGIN.
+config:
+  create: true
+  name: ""
+  existingConfigMap: ""
+  webOrigin: http://localhost:8080
+  # This origin is returned in generated MCP endpoints and must be reachable by
+  # clients. With same-origin ingress, use the same HTTPS origin as webOrigin.
+  apiOrigin: http://localhost:8787
+  extraData: {}
+
+# Sensitive runtime configuration. Direct values are intended for local smoke
+# tests. Production installs should use operator-managed existing Secrets.
+mongodb:
+  uri: ""
+  existingSecret: litemcp-secrets
+  annotations: {}
+  key: MONGODB_URI
+  database: litemcp
+
+auth:
+  secret: ""
+  existingSecret: litemcp-secrets
+  annotations: {}
+  key: BETTER_AUTH_SECRET
+
+autoscaling:
+  server:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+    behavior:
+      scaleUp:
+        stabilizationWindowSeconds: 0
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 60
+          - type: Pods
+            value: 2
+            periodSeconds: 60
+        selectPolicy: Max
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Percent
+            value: 25
+            periodSeconds: 60
+  web:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+    behavior:
+      scaleUp:
+        stabilizationWindowSeconds: 0
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 60
+          - type: Pods
+            value: 2
+            periodSeconds: 60
+        selectPolicy: Max
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Percent
+            value: 25
+            periodSeconds: 60
+
+podDisruptionBudget:
+  server:
+    enabled: true
+    minAvailable: 1
+    maxUnavailable: ""
+  web:
+    enabled: true
+    minAvailable: 1
+    maxUnavailable: ""
+
+server:
+  replicaCount: 2
+  demoMode: false
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 600
+  terminationGracePeriodSeconds: 30
+
+  podAnnotations: {}
+  podLabels: {}
+  deploymentAnnotations: {}
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    privileged: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+
+  service:
+    type: ClusterIP
+    port: 8787
+    annotations: {}
+    sessionAffinity: None
+
+  livenessProbe:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 2
+    successThreshold: 1
+    failureThreshold: 3
+
+  readinessProbe:
+    enabled: true
+    path: /ready
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 2
+    successThreshold: 1
+    failureThreshold: 3
+
+  startupProbe:
+    enabled: true
+    path: /ready
+    periodSeconds: 2
+    timeoutSeconds: 2
+    successThreshold: 1
+    failureThreshold: 30
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  env: []
+  envFrom: []
+  extraVolumeMounts: []
+  extraVolumes: []
+  initContainers: []
+  sidecars: []
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: '{{ include "litemcp.name" . }}'
+          app.kubernetes.io/instance: '{{ .Release.Name }}'
+          app.kubernetes.io/component: server
+  priorityClassName: ""
+  runtimeClassName: ""
+
+web:
+  replicaCount: 2
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 600
+  terminationGracePeriodSeconds: 30
+
+  podAnnotations: {}
+  podLabels: {}
+  deploymentAnnotations: {}
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 101
+    runAsGroup: 101
+    fsGroup: 101
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    privileged: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+
+  service:
+    type: ClusterIP
+    port: 8080
+    annotations: {}
+    sessionAffinity: None
+
+  livenessProbe:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 2
+    successThreshold: 1
+    failureThreshold: 3
+
+  readinessProbe:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 2
+    successThreshold: 1
+    failureThreshold: 3
+
+  startupProbe:
+    enabled: true
+    path: /health
+    periodSeconds: 2
+    timeoutSeconds: 2
+    successThreshold: 1
+    failureThreshold: 30
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+  env: []
+  envFrom: []
+  extraVolumeMounts: []
+  extraVolumes: []
+  initContainers: []
+  sidecars: []
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: '{{ include "litemcp.name" . }}'
+          app.kubernetes.io/instance: '{{ .Release.Name }}'
+          app.kubernetes.io/component: web
+  priorityClassName: ""
+  runtimeClassName: ""
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: litemcp.local
+      paths:
+        - path: /api
+          pathType: Prefix
+          service: server
+        - path: /mcp
+          pathType: Prefix
+          service: server
+        - path: /
+          pathType: Prefix
+          service: web
+  tls: []
+
+networkPolicy:
+  enabled: true
+  # Empty namespaceSelector permits ingress controllers in any namespace while
+  # still limiting traffic to the declared container ports.
+  ingressFrom:
+    - namespaceSelector: {}
+  # Server needs DNS, MongoDB, identity providers, and remote MCP/API services.
+  # Replace these rules with destination selectors/CIDRs in restricted clusters.
+  serverEgress:
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 27017
+  # The web container resolves and proxies same-origin API/MCP requests to the
+  # release-qualified server Service. Keep DNS and that pod-to-pod path open.
+  webEgress:
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: '{{ include "litemcp.name" . }}'
+              app.kubernetes.io/instance: '{{ .Release.Name }}'
+              app.kubernetes.io/component: server
+      ports:
+        - protocol: TCP
+          port: 8787

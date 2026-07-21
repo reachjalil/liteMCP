@@ -1,0 +1,47 @@
+flowchart TB
+  subgraph Clients
+    C1[Claude / Cursor / IDE]
+    C2[Agent runtime]
+    C3[Internal application]
+  end
+
+  subgraph Open_Data_Plane[Apache-2.0 data plane]
+    M[MCP Streamable HTTP endpoint]
+    I[Identity and audience validation]
+    P[Policy and approvals hook]
+    R[Namespace router and protocol adapters]
+    T[OpenTelemetry and audit events]
+  end
+
+  subgraph Credential_Options
+    LV[Local or customer vault]
+    MB[Optional managed credential broker]
+  end
+
+  subgraph Upstreams
+    U1[Remote MCP servers]
+    U2[stdio servers]
+    U3[API connector sandboxes]
+  end
+
+  subgraph Managed_Control_Plane[Optional managed control plane]
+    REG[Verified registry]
+    CI[Connector CI and compatibility]
+    FLEET[Fleet configuration]
+    BILL[Billing and enterprise admin]
+  end
+
+  C1 --> M
+  C2 --> M
+  C3 --> M
+  M --> I --> P --> R
+  R --> U1
+  R --> U2
+  R --> U3
+  P --> LV
+  P --> MB
+  R --> T
+  REG --> R
+  CI --> REG
+  FLEET --> R
+  BILL --> FLEET

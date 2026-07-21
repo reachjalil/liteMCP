@@ -1,0 +1,107 @@
+---
+import FeatureGrid from "../../components/FeatureGrid.astro";
+import PageHero from "../../components/PageHero.astro";
+import SectionHeader from "../../components/SectionHeader.astro";
+import { productPages, type ProductPage } from "../../content/site";
+import SiteLayout from "../../layouts/SiteLayout.astro";
+
+export const getStaticPaths = () =>
+  productPages.map((page) => ({
+    params: { slug: page.slug },
+    props: { page },
+  }));
+
+type Props = {
+  page: ProductPage;
+};
+
+const { page } = Astro.props;
+---
+
+<SiteLayout title={page.slug === "on-prem" ? "On-prem" : page.slug.charAt(0).toUpperCase() + page.slug.slice(1)} description={page.description}>
+  <PageHero
+    eyebrow={page.eyebrow}
+    title={page.title}
+    description={page.description}
+    signal={`${page.stage} · ${page.signal}`}
+  >
+    <Fragment slot="actions">
+      <a class="button button--primary button--large" href="/app">Open console</a>
+      <a class="button button--large" href="/docs">Read documentation</a>
+    </Fragment>
+  </PageHero>
+
+  <section class="content-section content-section--tight">
+    <div class="shell split-layout">
+      <div class="split-layout__aside">
+        <p class="eyebrow">Product boundary</p>
+        <h2>{page.summary}</h2>
+      </div>
+      <dl class="definition-grid">
+        <dt>Available now</dt>
+        <dd>Behavior backed by the current local vertical slice and automated tests.</dd>
+        <dt>Preview</dt>
+        <dd>Useful implementation exists, but the complete operating journey is not proven.</dd>
+        <dt>Planned</dt>
+        <dd>Part of the open MCP-native roadmap, not current product behavior.</dd>
+        <dt>Deployment</dt>
+        <dd>Managed cloud and self-hosted targets share portable packages; live parity remains an acceptance test.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section class="content-section content-section--subtle">
+    <div class="shell">
+      <SectionHeader
+        eyebrow="Capabilities"
+        title={`What ${page.slug === "on-prem" ? "on-prem operations" : page.slug} controls`}
+        description="Status labels distinguish tested behavior from useful previews and the open roadmap."
+      />
+      <FeatureGrid items={page.capabilities} />
+    </div>
+  </section>
+
+  <section class="content-section">
+    <div class="shell">
+      <SectionHeader
+        eyebrow="Operating flow"
+        title="The target journey, with current maturity called out above."
+      />
+      <div class="workflow-grid">
+        {page.workflow.map((item) => (
+          <article class="workflow-step">
+            <span>{item.step}</span>
+            <h3>{item.title}</h3>
+            <p>{item.description}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section content-section--subtle">
+    <div class="shell">
+      <SectionHeader
+        eyebrow="Target control surface"
+        title="Designed for platform and security teams."
+        description="These controls define the intended product boundary; the capability labels above are the current implementation record."
+      />
+      <ul class="control-grid plain-list">
+        {page.controls.map((control) => <li>{control}</li>)}
+      </ul>
+    </div>
+  </section>
+
+  <section class="content-section content-section--tight">
+    <div class="shell cta-panel">
+      <div>
+        <h2>Evaluate locally or inspect either deployment target.</h2>
+        <p>The managed cloud and Kubernetes paths are previews of one open codebase, with no intended capability gate or mandatory call-home path.</p>
+      </div>
+      <div class="cta-panel__actions">
+        <a class="button button--primary" href="/cloud">Managed cloud preview</a>
+        <a class="button" href="/docs/self-hosting">Kubernetes preview</a>
+      </div>
+    </div>
+  </section>
+</SiteLayout>

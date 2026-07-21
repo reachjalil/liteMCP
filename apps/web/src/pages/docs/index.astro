@@ -1,0 +1,147 @@
+---
+import PageHero from "../../components/PageHero.astro";
+import SectionHeader from "../../components/SectionHeader.astro";
+import { documentationReferences } from "../../content/docs";
+import SiteLayout from "../../layouts/SiteLayout.astro";
+
+const docs = [
+  [
+    "01",
+    "Getting started",
+    "Run the local stack, inspect the demo tenant, register a server, and create your first composition.",
+    "/docs/getting-started",
+  ],
+  [
+    "02",
+    "Self-hosting",
+    "Evaluate with Docker Compose or inspect the production-oriented Kubernetes target; live cluster proof is pending.",
+    "/docs/self-hosting",
+  ],
+  [
+    "03",
+    "Composition",
+    "Understand members, namespaces, aliases, versions, promotion, and rollback.",
+    "/product/composer",
+  ],
+  [
+    "04",
+    "Identity",
+    "Issue scoped gateway sessions and review preview federation wiring; connected accounts remain planned.",
+    "/product/identity",
+  ],
+  [
+    "05",
+    "Policy",
+    "Shape discovery and execution, simulate decisions, and introduce human approval.",
+    "/product/policy",
+  ],
+  [
+    "06",
+    "Security",
+    "Review trust boundaries, credential handling, tenant isolation, and disclosure policy.",
+    "/security",
+  ],
+];
+---
+
+<SiteLayout title="Documentation" description="Build, operate, and self-host LiteMCP Composer with guides for composition, identity, policy, routing, and Kubernetes.">
+  <PageHero
+    eyebrow="Documentation"
+    title="Build one governed MCP endpoint."
+    description="Start with the tested local slice, then inspect the managed cloud and Kubernetes targets. Live cross-target portability remains an explicit acceptance test."
+    signal="Available, preview, and planned work labeled"
+    compact
+  >
+    <Fragment slot="actions">
+      <a class="button button--primary button--large" href="/docs/getting-started">Start the quickstart</a>
+      <a class="button button--large" href="/docs/self-hosting">Self-host LiteMCP Composer</a>
+    </Fragment>
+  </PageHero>
+
+  <section class="content-section">
+    <div class="shell">
+      <SectionHeader
+        eyebrow="Guides"
+        title="From first composition toward production operations."
+      />
+      <div class="doc-card-grid">
+        {docs.map(([index, title, description, href]) => (
+          <a class="doc-card" href={href}>
+            <span>{index}</span>
+            <h2>{title}</h2>
+            <p>{description}</p>
+          </a>
+        ))}
+      </div>
+      <div class="legal-note">
+        Preparing an upgrade or compatibility commitment? Read the{" "}
+        <a href="https://github.com/reachjalil/liteMCP/blob/main/docs/release-and-lts-policy.md">current pre-1.0 release and LTS policy ↗</a>.
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section content-section--subtle">
+    <div class="shell">
+      <SectionHeader
+        eyebrow="Repository reference"
+        title="Move from product questions to exact implementation evidence."
+        description="These maps explain when to use each maintained Markdown reference, what it covers, and where the current proof stops. The full source remains in the public repository."
+      />
+      <div class="doc-card-grid">
+        {documentationReferences.map((reference) => (
+          <a class="doc-card" href={`/docs/reference/${reference.slug}`}>
+            <span>{reference.index}</span>
+            <h2>{reference.title}</h2>
+            <p>{reference.description}</p>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section">
+    <div class="shell">
+      <SectionHeader
+        eyebrow="Evidence and boundaries"
+        title="Read the current status before planning a production rollout."
+        description="The maintained source index covers the complete documentation set; status and limitations distinguish tested behavior from preview, designed, and blocked work."
+      />
+      <div class="doc-card-grid">
+        <a class="doc-card" href="https://github.com/reachjalil/liteMCP/blob/main/IMPLEMENTATION_STATUS.md">
+          <span>E1</span>
+          <h2>Implementation status ↗</h2>
+          <p>Reproducible evidence, acceptance scenarios, and the exact work still required.</p>
+        </a>
+        <a class="doc-card" href="https://github.com/reachjalil/liteMCP/blob/main/docs/known-limitations.md">
+          <span>E2</span>
+          <h2>Known limitations ↗</h2>
+          <p>Security, consistency, identity, protocol, and operational boundaries for this snapshot.</p>
+        </a>
+        <a class="doc-card" href="https://github.com/reachjalil/liteMCP/blob/main/docs/README.md">
+          <span>E3</span>
+          <h2>Complete documentation index ↗</h2>
+          <p>Every maintained product, engineering, security, identity, policy, and operations document.</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section">
+    <div class="shell split-layout">
+      <div class="split-layout__aside">
+        <p class="eyebrow">Core API</p>
+        <h2>A small typed surface with explicit tenancy.</h2>
+        <p>Management responses include a request ID, and failures use a consistent problem envelope.</p>
+      </div>
+      <div class="code-window">
+        <div class="code-window__bar"><span>Request</span><span>Control plane API v1</span></div>
+        <pre><code>curl http://localhost:8787/api/v1/overview \
+  -H <span class="code-value">'x-litemcp-tenant: org_demo'</span> \
+  -H <span class="code-value">'x-litemcp-role: finance-admin'</span>
+
+<span class="code-comment"># Demo headers are for explicit local demo mode only.</span>
+<span class="code-comment"># Production resolves tenant and role from authenticated identity.</span></code></pre>
+      </div>
+    </div>
+  </section>
+</SiteLayout>

@@ -1,0 +1,99 @@
+---
+import PageHero from "../components/PageHero.astro";
+import SectionHeader from "../components/SectionHeader.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+
+const commitments = [
+  [
+    "One open roadmap",
+    "Available, preview, and planned gateway, registry, policy, identity, audit, and deployment work stays public.",
+  ],
+  [
+    "No license server",
+    "Self-hosted operation never requires a cloud account, activation server, or call-home path.",
+  ],
+  [
+    "Portable state",
+    "Configuration export exists in preview; complete cross-target import and execution remains an acceptance gate.",
+  ],
+  [
+    "Open compatibility",
+    "SDKs and gateway fixtures are public; the connector and named-client compatibility matrix is planned.",
+  ],
+  [
+    "Visible security process",
+    "The disclosure policy and limitations are public; signed releases, revocation feeds, and supported release lines remain planned.",
+  ],
+  [
+    "Optional telemetry",
+    "The current slice has no telemetry exporter; any future self-hosted export must be opt-in and documented field by field.",
+  ],
+];
+---
+
+<SiteLayout title="Open source" description="LiteMCP Composer is an Apache-2.0 MCP composition control plane with a call-home-free self-hosted preview and a fully public product roadmap.">
+  <PageHero
+    eyebrow="Open-source commitment"
+    title="The whole MCP-native roadmap stays open."
+    description="LiteMCP Composer is licensed under Apache 2.0. Current code and future security, identity, policy, audit, high-availability, and on-prem work are intended to mature in public—not behind closed feature gates."
+    signal="Operational services, not hidden features"
+  >
+    <Fragment slot="actions">
+      <a class="button button--primary button--large" href="https://github.com/reachjalil/liteMCP">View GitHub ↗</a>
+      <a class="button button--large" href="/docs/getting-started">Run it locally</a>
+      <a class="button button--large" href="/changelog">Release policy</a>
+    </Fragment>
+  </PageHero>
+
+  <section class="content-section">
+    <div class="shell">
+      <SectionHeader
+        eyebrow="Project covenant"
+        title="Portable by architecture and by policy."
+        description="These boundaries are part of the product definition and should be reviewable in source, tests, and release artifacts."
+      />
+      <div class="feature-grid">
+        {commitments.map(([title, description], index) => (
+          <article class="feature-card">
+            <span class="feature-card__index">{String(index + 1).padStart(2, "0")}</span>
+            <h3>{title}</h3>
+            <p>{description}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section content-section--subtle">
+    <div class="shell split-layout">
+      <div class="split-layout__aside">
+        <p class="eyebrow">Governance</p>
+        <h2>Trust needs a public operating record.</h2>
+        <p>
+          The project is being established with a public roadmap, contribution process,
+          security policy, release notes, and a maintainer path. Foundation governance can be
+          evaluated after meaningful ecosystem participation exists.
+        </p>
+      </div>
+      <ul class="principle-list">
+        <li><span>01</span><div><strong>Public roadmap</strong><p>Priorities, validation gates, and known limitations are visible.</p></div></li>
+        <li><span>02</span><div><strong>Reviewable releases</strong><p>Signed manifests, checksums, SBOMs, and rollback notes are release gates, not current artifacts.</p></div></li>
+        <li><span>03</span><div><strong>Contributor credit</strong><p>Connector and core contributors retain visible attribution and a maintainer path.</p></div></li>
+        <li><span>04</span><div><strong>No payload economy</strong><p>Diagnostics do not require customer tool arguments or responses.</p></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="content-section content-section--tight">
+    <div class="shell cta-panel">
+      <div>
+        <h2>Inspect the architecture, then help prove the exit test.</h2>
+        <p>Portability is achieved only when a cloud-exported configuration executes on the self-hosted target without proprietary conversion; that live test is still pending.</p>
+      </div>
+      <div class="cta-panel__actions">
+        <a class="button button--primary" href="/docs/self-hosting">Self-hosting guide</a>
+        <a class="button" href="/security">Security model</a>
+      </div>
+    </div>
+  </section>
+</SiteLayout>

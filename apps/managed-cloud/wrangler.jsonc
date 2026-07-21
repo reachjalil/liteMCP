@@ -1,0 +1,49 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "litemcp",
+  "main": "./src/index.ts",
+  "compatibility_date": "2026-07-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "litemcpcomposer.com",
+      "custom_domain": true
+    },
+    {
+      "pattern": "www.litemcpcomposer.com",
+      "custom_domain": true
+    }
+  ],
+  "send_metrics": false,
+  "keep_vars": true,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "../web/dist",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/api/*", "/mcp/*", "/health", "/ready", "/demo-upstreams/*"]
+  },
+  "vars": {
+    "PUBLIC_ORIGIN": "https://litemcpcomposer.com",
+    "WEB_ORIGINS": "https://litemcpcomposer.com,https://www.litemcpcomposer.com",
+    "LITEMCP_DEMO_MODE": "false"
+  },
+  "secrets": {
+    "required": ["BETTER_AUTH_SECRET"]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "DATA_KV"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "AUTH_DB"
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+---
+import DocPageLayout from "../../layouts/DocPageLayout.astro";
+---
+
+<DocPageLayout
+  title="Getting started"
+  description="Run LiteMCP Composer locally and create a governed composition backed by real control-plane APIs."
+  currentPath="/docs/getting-started"
+>
+  <div class="callout">
+    <strong>Development status</strong>
+    <p>LiteMCP Composer is in early open-source development. Use the explicit demo mode only with local or disposable data.</p>
+  </div>
+
+  <h2 id="prerequisites">Prerequisites</h2>
+  <ul>
+    <li>Node.js 22.12 or newer</li>
+    <li>pnpm 10.30</li>
+    <li>Docker with Compose only when evaluating the packaged self-hosted stack</li>
+  </ul>
+
+  <h2 id="install">Install the workspace</h2>
+  <pre><code>git clone https://github.com/reachjalil/liteMCP.git
+cd liteMCP
+pnpm install --frozen-lockfile</code></pre>
+  <p>
+    The source demo uses in-memory data and a fixed local-only identity. Do not expose it to a
+    shared network or treat it as an authentication test.
+  </p>
+
+  <h2 id="run">Run the local source demo</h2>
+  <pre><code>LITEMCP_DEMO_MODE=true pnpm dev</code></pre>
+  <p>
+    The web surface defaults to <code>http://localhost:4321</code> and the management API to
+    <code>http://localhost:8787</code>. The root command starts only the portable Node server and
+    Astro site; use <code>pnpm managed-cloud:dev</code> separately for the managed cloud runtime.
+  </p>
+
+  <h2 id="inspect">Inspect the control plane</h2>
+  <pre><code>curl --fail-with-body http://localhost:8787/api/v1/overview \
+  -H 'x-litemcp-tenant: org_demo' \
+  -H 'x-litemcp-role: finance-admin'</code></pre>
+  <p>
+    Those headers are accepted only as the explicit demo identity. Production requests must
+    derive tenant membership and roles from the authenticated server session.
+  </p>
+
+  <h2 id="register">Register an upstream MCP server</h2>
+  <pre><code>{`curl --fail-with-body -X POST http://localhost:8787/api/v1/servers \\
+	  -H 'content-type: application/json' \\
+	  -H 'x-litemcp-tenant: org_demo' \\
+	  -H 'x-litemcp-role: finance-admin' \\
+  -d '{
+    "slug": "internal-docs",
+    "name": "Internal docs",
+    "description": "Read-only documentation search",
+    "transport": "streamable-http",
+    "endpoint": "https://mcp.example.net/mcp",
+    "version": "1.0.0",
+    "visibility": "private",
+    "tags": ["docs", "read-only"],
+    "tools": []
+  }'`}</code></pre>
+
+  <h2 id="compose">Create a composition</h2>
+  <p>
+    Open <a href="/app#composer">Console → Composer</a>, choose a registered server, assign a
+    namespace, and create the composition. The console posts the exact member and alias structure
+    to <code>/api/v1/compositions</code>; it does not maintain a browser-only copy.
+  </p>
+
+  <h2 id="policy">Simulate policy before issuing a session</h2>
+  <p>
+    Use <a href="/app#policy">Policy simulator</a> to test a subject, action, tool, and risk class.
+    The response explains whether execution is allowed, denied, or requires approval and identifies
+    the matching rule IDs.
+  </p>
+
+  <h2 id="next">Next steps</h2>
+  <ul>
+    <li>Review <a href="/product/identity">identity and gateway sessions</a>.</li>
+    <li>Read the <a href="/security">security boundary overview</a>.</li>
+    <li>Inspect the <a href="/docs/self-hosting">Kubernetes deployment preview</a> and its remaining runtime proof.</li>
+  </ul>
+</DocPageLayout>

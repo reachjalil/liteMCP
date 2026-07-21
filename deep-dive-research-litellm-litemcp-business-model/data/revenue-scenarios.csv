@@ -1,0 +1,4 @@
+scenario,starter_customers,growth_customers,business_customers,enterprise_customers,enterprise_acv_usd,base_subscription_arr_usd,usage_uplift_rate,usage_uplift_usd,annualized_revenue_usd,status
+Conservative,350,80,15,5,36000,1038660,0.15,155799.0,1194459.0,illustrative-not-forecast
+Base,700,180,40,12,45000,2532960,0.15,379944.0,2912904.0,illustrative-not-forecast
+Upside,1200,350,80,25,60000,5320440,0.2,1064088.0,6384528.0,illustrative-not-forecast

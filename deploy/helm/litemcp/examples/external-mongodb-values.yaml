@@ -1,0 +1,34 @@
+# External MongoDB profile. The URI should select a replica set and use TLS.
+# Provision this Secret out-of-band; do not commit the URI to a values file.
+mongodb:
+  uri: ""
+  existingSecret: litemcp-mongodb
+  key: connection-string
+
+auth:
+  existingSecret: litemcp-auth
+  key: better-auth-secret
+
+config:
+  webOrigin: https://mcp.company.example
+  apiOrigin: https://mcp.company.example
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: mcp.company.example
+      paths:
+        - path: /api
+          pathType: Prefix
+          service: server
+        - path: /mcp
+          pathType: Prefix
+          service: server
+        - path: /
+          pathType: Prefix
+          service: web
+  tls:
+    - secretName: litemcp-company-tls
+      hosts:
+        - mcp.company.example

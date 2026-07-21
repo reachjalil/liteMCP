@@ -1,0 +1,51 @@
+---
+import PageHero from "../components/PageHero.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+
+const updates = [
+  [
+    "Architecture",
+    "Why one MCP endpoint needs separate control and data planes",
+    "A technical note on stable client contracts, identity, policy, routing, and portable deployment.",
+  ],
+  [
+    "Security",
+    "Policy must shape discovery and execution",
+    "The reason a deny decision has to apply before a capability is listed and again before it runs.",
+  ],
+  [
+    "Operations",
+    "What complete self-hosting actually requires",
+    "Beyond a Helm install: preflight, identity, vaults, backup, upgrade, rollback, and diagnostics.",
+  ],
+];
+---
+
+<SiteLayout title="Updates" description="LiteMCP Composer engineering updates, architecture notes, security decisions, and release operations.">
+  <PageHero
+    eyebrow="Engineering updates"
+    title="Architecture, security, and operations in public."
+    description="This publication will document the decisions behind LiteMCP Composer, compatibility findings, release evidence, security changes, and the work required to operate a portable MCP control plane."
+    signal="Evidence before announcement"
+    compact
+  />
+
+  <section class="content-section">
+    <div class="shell blog-grid">
+      {updates.map(([category, title, description]) => (
+        <article class="blog-card">
+          <div class="blog-card__meta"><span>{category}</span><span>Editorial queue</span></div>
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="content-section content-section--tight">
+    <div class="shell legal-note">
+      The update structure is live; individual posts are not presented as published until their
+      technical review and evidence links are complete.
+    </div>
+  </section>
+</SiteLayout>

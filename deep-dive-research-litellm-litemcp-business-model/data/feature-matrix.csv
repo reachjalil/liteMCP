@@ -1,0 +1,11 @@
+axis,litellm,composio,obot,contextforge,metamcp,mcpjungle,docker_gateway,litemcp_proposal,evidence_keys
+unified_endpoint,yes,yes,yes,yes,yes,yes,yes,open,S-026;S-040;S-042;S-045;S-046;S-047
+functional_open_gateway,yes_mit_core,no_backend_evidence,yes,yes_apache,yes,yes,ecosystem_bound,proposed_apache,S-006;S-029;S-032;S-040;S-042
+managed_per_user_auth,partial,strong,yes_cloud,configurable,limited,limited,credential_management,proposed_strong_portable,S-003;S-027;S-043;S-047
+managed_oauth_lifecycle,enterprise_adjacent,core_hosted_value,cloud,partial,limited,limited,partial,paid_cloud,S-003;S-027;S-043
+credential_portability_contract,customer_hosted,unclear,self_host_path,self_host,self_host,self_host,local,explicit_proposed,S-003;S-026;S-040;S-042
+verified_connector_assurance,no_comparable,vendor_managed_opaque,partial,supply_chain_features,no_clear,no_clear,catalog_curation,core_differentiator,S-026;S-039;S-040
+enterprise_idp,paid,paid,paid,auth_support,limited,limited,ecosystem,paid,S-003;S-026;S-043
+metadata_audit,paid,paid,yes,yes,mixed,yes,logs,open_export_paid_retention,S-003;S-026;S-040;S-042
+lts_channel,no,service_managed,unknown,unknown,unknown,unknown,vendor_managed,proposed_12_month,S-003
+public_usage_pricing,no,yes_time_sensitive,limited,oss,oss,oss,bundled,proposed,S-025

@@ -1,0 +1,61 @@
+# Mirror both images into the approved internal registry before installation.
+image:
+  server:
+    repository: registry.internal.example/platform/litemcp-server
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  web:
+    repository: registry.internal.example/platform/litemcp-web
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: internal-registry
+
+mongodb:
+  existingSecret: litemcp-mongodb
+  key: MONGODB_URI
+
+auth:
+  existingSecret: litemcp-auth
+  key: BETTER_AUTH_SECRET
+
+config:
+  webOrigin: https://litemcp.internal.example
+  apiOrigin: https://litemcp.internal.example
+
+# Restrict egress to DNS, the in-cluster database, and an internal HTTPS IdP.
+# Add ipBlock or namespace/pod selectors required by the target environment.
+networkPolicy:
+  enabled: true
+  serverEgress:
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - ports:
+        - protocol: TCP
+          port: 27017
+        - protocol: TCP
+          port: 443
+
+ingress:
+  enabled: true
+  className: internal-nginx
+  hosts:
+    - host: litemcp.internal.example
+      paths:
+        - path: /api
+          pathType: Prefix
+          service: server
+        - path: /mcp
+          pathType: Prefix
+          service: server
+        - path: /
+          pathType: Prefix
+          service: web
+  tls:
+    - secretName: litemcp-internal-tls
+      hosts:
+        - litemcp.internal.example

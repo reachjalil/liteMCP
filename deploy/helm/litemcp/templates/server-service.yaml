@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "litemcp.server.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "litemcp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+  {{- with .Values.server.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.server.service.type }}
+  sessionAffinity: {{ .Values.server.service.sessionAffinity }}
+  ports:
+    - name: http
+      port: {{ .Values.server.service.port }}
+      targetPort: http
+      protocol: TCP
+      appProtocol: http
+  selector:
+    {{- include "litemcp.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: server

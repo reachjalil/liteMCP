@@ -1,0 +1,71 @@
+---
+const columns = [
+  {
+    title: "Product",
+    links: [
+      ["Composer", "/product/composer"],
+      ["Registry", "/product/registry"],
+      ["Identity", "/product/identity"],
+      ["Policy", "/product/policy"],
+      ["Routing", "/product/routing"],
+      ["Observability", "/product/observability"],
+      ["On-prem", "/product/on-prem"],
+    ],
+  },
+  {
+    title: "Developers",
+    links: [
+      ["Documentation", "/docs"],
+      ["Getting started", "/docs/getting-started"],
+      ["Self-hosting", "/docs/self-hosting"],
+      ["Open source", "/open-source"],
+      ["Changelog", "/changelog"],
+    ],
+  },
+  {
+    title: "Company",
+    links: [
+      ["Managed cloud", "/cloud"],
+      ["Enterprise", "/enterprise"],
+      ["Security", "/security"],
+      ["Pricing", "/pricing"],
+      ["Updates", "/blog"],
+    ],
+  },
+] as const;
+---
+
+<footer class="site-footer">
+  <div class="shell site-footer__grid">
+    <div class="site-footer__brand">
+      <a class="wordmark" href="/" aria-label="LiteMCP Composer home">
+        <span>Lite</span><strong>MCP</strong><span class="wordmark__suffix">Composer</span>
+      </a>
+      <p>
+        One governed MCP entry point for every user and agent, assembled from the servers
+        you choose.
+      </p>
+      <div class="site-footer__status">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span>Project status: early open-source development</span>
+      </div>
+    </div>
+    {
+      columns.map((column) => (
+        <div class="site-footer__column">
+          <h2>{column.title}</h2>
+          <ul>
+            {column.links.map(([label, href]) => (
+              <li><a href={href}>{label}</a></li>
+            ))}
+          </ul>
+        </div>
+      ))
+    }
+  </div>
+  <div class="shell site-footer__bottom">
+    <span>© 2026 LiteMCP Composer contributors</span>
+    <span>Apache License 2.0</span>
+    <span>No mandatory telemetry for self-hosted deployments</span>
+  </div>
+</footer>

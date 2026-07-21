@@ -1,0 +1,72 @@
+---
+import PageHero from "../components/PageHero.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+---
+
+<SiteLayout title="Pricing" description="LiteMCP Composer is Apache-2.0 software. Managed cloud availability and enterprise service terms are planned, not currently offered as production commitments.">
+  <PageHero
+    eyebrow="Pricing"
+    title="The software is open. Service terms come after release proof."
+    description="Evaluate the Apache-2.0 source today. The intended managed cloud remains free under future published fair-use limits, while enterprise services will be scoped only when delivery and support terms are ready."
+    signal="Pre-1.0 product and service model"
+  />
+
+  <section class="content-section">
+    <div class="shell price-grid">
+      <article class="price-card">
+        <span class="price-card__label">Managed cloud · Preview</span>
+        <h2>Community-cloud target</h2>
+        <div class="price-card__price">Planned</div>
+        <p>The deployment source builds, but no public operated service or availability date is claimed.</p>
+        <ul class="check-list">
+          <li>Intended free community model</li>
+          <li>Fair-use controls published before launch</li>
+          <li>Configuration export in preview</li>
+          <li>No uptime or support commitment yet</li>
+        </ul>
+        <a class="button" href="/cloud">Managed cloud details</a>
+      </article>
+      <article class="price-card price-card--featured">
+        <span class="price-card__label">Your infrastructure · Preview</span>
+        <h2>Self-hosted source</h2>
+        <div class="price-card__price">Free</div>
+        <p>The current vertical slice and deployment assets under Apache License 2.0.</p>
+        <ul class="check-list">
+          <li>Docker images and Compose configuration</li>
+          <li>Helm chart lint/render validation</li>
+          <li>Policy and audit vertical slice</li>
+          <li>Identity federation wiring in preview</li>
+          <li>No call-home requirement</li>
+        </ul>
+        <a class="button button--primary" href="/docs/self-hosting">Deployment guide</a>
+      </article>
+      <article class="price-card">
+        <span class="price-card__label">Professional services · Planned</span>
+        <h2>On-prem support</h2>
+        <div class="price-card__price">Not published</div>
+        <p>Future engagements may be scoped for topology, environments, responsibilities, and response needs.</p>
+        <ul class="check-list">
+          <li>Architecture and installation</li>
+          <li>Identity and vault integration</li>
+          <li>HA, backup, and upgrades</li>
+          <li>Future security and support terms</li>
+        </ul>
+        <a class="button" href="/enterprise">Service scope</a>
+      </article>
+    </div>
+  </section>
+
+  <section class="content-section content-section--subtle">
+    <div class="shell split-layout">
+      <div class="split-layout__aside">
+        <p class="eyebrow">Plain-language model</p>
+        <h2>No capability matrix designed to force an upgrade.</h2>
+      </div>
+      <ul class="principle-list">
+        <li><span>01</span><div><strong>Managed cloud is an intended free service</strong><p>No live service exists yet; fair-use limits will be published before general availability.</p></div></li>
+        <li><span>02</span><div><strong>Self-hosting follows one open roadmap</strong><p>Available, preview, and planned identity, policy, audit, and operations capabilities remain public.</p></div></li>
+        <li><span>03</span><div><strong>Services are intended to buy responsibility</strong><p>Future contracts should cover human work, release support, escalation, and response—not a secret binary.</p></div></li>
+      </ul>
+    </div>
+  </section>
+</SiteLayout>

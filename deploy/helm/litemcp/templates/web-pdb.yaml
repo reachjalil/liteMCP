@@ -1,0 +1,20 @@
+{{- if .Values.podDisruptionBudget.web.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "litemcp.web.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "litemcp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  {{- if ne (toString .Values.podDisruptionBudget.web.maxUnavailable) "" }}
+  maxUnavailable: {{ .Values.podDisruptionBudget.web.maxUnavailable | quote }}
+  {{- else }}
+  minAvailable: {{ .Values.podDisruptionBudget.web.minAvailable | quote }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "litemcp.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: web
+{{- end }}

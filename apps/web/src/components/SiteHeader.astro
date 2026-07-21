@@ -1,0 +1,86 @@
+---
+import { productLinks, publicNavigation } from "../content/site";
+
+type Props = {
+  currentPath: string;
+};
+
+const { currentPath } = Astro.props;
+const isActive = (href: string) =>
+  href === "/" ? currentPath === "/" : currentPath.startsWith(href);
+---
+
+<div class="site-notice">
+  <div class="shell site-notice__inner">
+    <span>Apache 2.0</span>
+    <span aria-hidden="true">/</span>
+    <span>Pre-1.0 · managed cloud and self-hosted previews</span>
+    <a href="/open-source">Read the open-source commitment <span aria-hidden="true">→</span></a>
+  </div>
+</div>
+<header class="site-header">
+  <div class="shell site-header__inner">
+    <a class="wordmark" href="/" aria-label="LiteMCP Composer home">
+      <span>Lite</span><strong>MCP</strong><span class="wordmark__suffix">Composer</span>
+    </a>
+
+    <nav class="desktop-nav" aria-label="Primary navigation">
+      {
+        publicNavigation.map((item) =>
+          item.label === "Product" ? (
+            <details class="nav-popover">
+              <summary class:list={["nav-link", isActive(item.href) && "is-active"]}>
+                Product <span aria-hidden="true">⌄</span>
+              </summary>
+              <div class="nav-popover__panel">
+                <div class="nav-popover__heading">
+                  <span class="eyebrow">Platform</span>
+                  <strong>One governed MCP entry point.</strong>
+                </div>
+                <div class="nav-popover__links">
+                  {productLinks.map((link) => (
+                    <a href={link.href}>
+                      <span>{link.shortLabel}</span>
+                      <span aria-hidden="true">↗</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </details>
+          ) : (
+            <a
+              class:list={["nav-link", isActive(item.href) && "is-active"]}
+              href={item.href}
+              aria-current={isActive(item.href) ? "page" : undefined}
+            >
+              {item.label}
+            </a>
+          )
+        )
+      }
+    </nav>
+
+    <div class="site-header__actions">
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="Toggle theme">
+        <span class="theme-toggle__light" aria-hidden="true">◐</span>
+        <span class="theme-toggle__dark" aria-hidden="true">◑</span>
+      </button>
+      <a class="button button--quiet button--small header-login" href="/login">Sign in</a>
+      <a class="button button--primary button--small" href="/app">Open console</a>
+      <details class="mobile-nav">
+        <summary aria-label="Open navigation"><span></span><span></span></summary>
+        <div class="mobile-nav__panel">
+          <a href="/">Home</a>
+          <span class="mobile-nav__label">Product</span>
+          {productLinks.map((link) => <a href={link.href}>{link.shortLabel}</a>)}
+          {publicNavigation.filter((item) => item.label !== "Product").map((item) => (
+            <a href={item.href}>{item.label}</a>
+          ))}
+          <a href="/security">Security</a>
+          <a href="/changelog">Changelog</a>
+          <a href="/blog">Blog</a>
+        </div>
+      </details>
+    </div>
+  </div>
+</header>

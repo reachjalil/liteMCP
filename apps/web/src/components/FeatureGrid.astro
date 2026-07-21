@@ -1,0 +1,33 @@
+---
+type Feature = {
+  title: string;
+  description: string;
+  status?: "Available now" | "Preview" | "Planned";
+};
+
+type Props = {
+  items: Feature[];
+  numbered?: boolean;
+};
+
+const { items, numbered = true } = Astro.props;
+---
+
+<div class="feature-grid">
+  {
+    items.map((item, index) => (
+      <article class="feature-card">
+        <div class="feature-card__meta">
+          {numbered ? <span class="feature-card__index">{String(index + 1).padStart(2, "0")}</span> : null}
+          {item.status ? (
+            <span class:list={["feature-card__status", `feature-card__status--${item.status.toLowerCase().replaceAll(" ", "-")}`]}>
+              {item.status}
+            </span>
+          ) : null}
+        </div>
+        <h3>{item.title}</h3>
+        <p>{item.description}</p>
+      </article>
+    ))
+  }
+</div>

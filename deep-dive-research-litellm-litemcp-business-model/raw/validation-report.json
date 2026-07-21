@@ -1,0 +1,23 @@
+{
+  "validated_at_utc": "2026-07-20T13:56:15Z",
+  "root": "deep-dive-research-litellm-litemcp-business-model",
+  "expected_files_checked": 51,
+  "numbered_markdown_files": 34,
+  "evidence_keys": 56,
+  "checks": {
+    "required_files": "pass",
+    "yaml_front_matter": "pass",
+    "standard_sections": "pass",
+    "citation_key_resolution": "pass",
+    "summary_word_limit": "pass",
+    "front_matter_source_counts": "pass",
+    "csv_shape": "pass",
+    "citation_ranges_expanded": "pass",
+    "archive_snapshots": "exception-disclosed",
+    "live_product_trials": "not-performed-disclosed",
+    "zip_integrity": "pass",
+    "zip_source_parity": "pass"
+  },
+  "zip_members": 53,
+  "zip_filename": "deep-dive-research-litellm-litemcp-business-model-2026-07-20.zip"
+}

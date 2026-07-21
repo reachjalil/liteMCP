@@ -1,0 +1,10 @@
+source_key,surface,gist,sentiment,theme,recurrence,limitations
+S-019,GitHub issue,LiteLLM MCP auth header not sent,negative,auth,yes,Specific bug; not prevalence
+S-020,GitHub issue,Server-specific auth header parsing,negative,auth,yes,Specific bug
+S-021,GitHub issue,Responses API MCP tools compatibility,negative,translation,yes,Specific bug
+S-024,GitHub issue,Responses bridge drops/mishandles tool semantics,negative,translation,yes,Open issue as cited
+S-022,GitHub issue,Enterprise-only field confused key generation,confused,packaging,yes,Boundary diagnostics
+S-023,GitHub issue,Nonprofit enterprise cost blocker,negative,pricing,no,Single user signal
+S-016,Security issue,Compromised PyPI releases,negative,supply_chain,yes,High-impact incident
+S-033,Status page,GitHub connection degradation,negative,reliability,yes,Hosted connector dependency
+S-039,Registry policy,Minimal moderation and vulnerable servers retained,cautious,verification,yes,Official policy

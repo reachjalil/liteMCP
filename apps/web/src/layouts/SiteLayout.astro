@@ -1,0 +1,84 @@
+---
+import SiteFooter from "../components/SiteFooter.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import "../styles/global.css";
+
+type Props = {
+  title?: string;
+  description: string;
+  path?: string;
+  noIndex?: boolean;
+  bodyClass?: string;
+};
+
+const {
+  title,
+  description,
+  path = Astro.url.pathname,
+  noIndex = false,
+  bodyClass = "",
+} = Astro.props;
+const siteName = "LiteMCP Composer";
+const resolvedTitle = title
+  ? `${title} — ${siteName}`
+  : `${siteName} — Governed MCP composition`;
+const canonical = new URL(path, Astro.site ?? "https://litemcpcomposer.com").toString();
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{resolvedTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#080a09" />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={siteName} />
+    <meta property="og:title" content={resolvedTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={resolvedTitle} />
+    <meta name="twitter:description" content={description} />
+    {noIndex ? <meta name="robots" content="noindex, nofollow" /> : null}
+    <script is:inline>
+      (() => {
+        try {
+          const stored = localStorage.getItem("litemcp-theme");
+          document.documentElement.dataset.theme = stored || "dark";
+        } catch {
+          document.documentElement.dataset.theme = "dark";
+        }
+      })();
+    </script>
+  </head>
+  <body class={bodyClass}>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <SiteHeader currentPath={Astro.url.pathname} />
+    <main id="main-content">
+      <slot />
+    </main>
+    <SiteFooter />
+    <script is:inline>
+      (() => {
+        const button = document.querySelector("[data-theme-toggle]");
+        if (!(button instanceof HTMLButtonElement)) return;
+        const syncLabel = () => {
+          const dark = document.documentElement.dataset.theme === "dark";
+          button.setAttribute("aria-label", `Switch to ${dark ? "light" : "dark"} theme`);
+          button.dataset.mode = dark ? "dark" : "light";
+        };
+        syncLabel();
+        button.addEventListener("click", () => {
+          const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+          document.documentElement.dataset.theme = next;
+          try { localStorage.setItem("litemcp-theme", next); } catch {}
+          syncLabel();
+        });
+      })();
+    </script>
+  </body>
+</html>

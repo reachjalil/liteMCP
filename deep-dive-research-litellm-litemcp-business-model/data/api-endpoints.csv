@@ -1,0 +1,17 @@
+path,method,purpose,packaging,auth,versioning,notes
+/mcp/{gateway_slug},POST,MCP JSON-RPC over Streamable HTTP,open,OAuth/OIDC/JWT/API key bootstrap,protocol-negotiated,Primary client endpoint
+/v1/gateways,POST,Create gateway,open,admin/workload,v1,Idempotency-Key
+/v1/gateways/{id},"GET,PATCH",Read/update gateway,open,admin/workload,v1,Config exportable
+/v1/upstreams,POST,Register upstream,open,admin,v1,"Remote, stdio or API adapter"
+/v1/upstreams/{id}:probe,POST,Health/schema/auth probe,open,admin,v1,No destructive calls
+/v1/tools,GET,Search normalized tools,open,principal/admin,v1,Policy-filtered
+/v1/connections,POST,Create connected account,open-local;paid-managed,principal,v1,Re-consent may be required
+/v1/auth/configs,POST,Define auth app/config,open-BYO;paid-managed,admin,v1,Customer or vendor OAuth app
+/v1/policies:compile,POST,Compile policy,open,admin,v1,Deterministic
+/v1/policies:simulate,POST,Explain decision,open,admin,v1,No execution
+/v1/invocations,GET,Query audit metadata,open-local;paid-retention,auditor/admin,v1,No payload by default
+/v1/approvals,POST,Request/decide action,enterprise,principal/approver,v1,Arguments hash-bound
+/v1/registry/connectors,GET,Connector/build metadata,open,public/principal,v1,Signed digests
+/v1/compatibility/reports,GET,Compatibility evidence,public-summary;paid-private,public/admin,v1,Client/auth/spec dimensions
+/v1/exports,POST,Portable export,open,admin,v1,Config/policy/connection metadata
+/v1/fleet/deployments,POST,Managed rollout,cloud-enterprise,admin,v1,Canary/rollback

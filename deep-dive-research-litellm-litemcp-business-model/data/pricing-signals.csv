@@ -1,0 +1,12 @@
+product,tier,price_usd,period,included_meter,notes,evidence_keys,status
+LiteLLM,Open Source,0,month,not_usage_metered,Core product,S-002,observed
+LiteLLM,Enterprise,,annual/custom,deployment_size_private_offer,SSO/audit/support/SLA,S-003;S-009,observed-opaque
+Composio,Free,0,month,20000 tool calls,Community support,S-025,observed-as-of-2026-07-20
+Composio,Low tier,29,month,200000 calls; 0.299/1K overage,Email support,S-025,observed-changing-2026-08-15
+Composio,Business,229,month,2000000 calls; 0.249/1K overage,Support threshold,S-025,observed-changing-2026-08-15
+Composio,Enterprise,,custom,users+volume,SLA/SOC2/VPC/on-prem,S-025,observed
+liteMCP,Cloud Free,0,month,20000 successful executions;10 active connections,Proposed,,proposal
+liteMCP,Starter,49,month,250000 executions;50 connections,Proposed,,proposal
+liteMCP,Growth,399,month,2000000 executions;500 connections,Proposed,,proposal
+liteMCP,Business,1499,month,10000000 executions;2000 connections,Proposed,,proposal
+liteMCP,Enterprise,30000+,year,contract,Proposed floor,,proposal

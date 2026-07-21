@@ -1,0 +1,38 @@
+LiteMCP Composer {{ .Chart.AppVersion }} has been rendered for namespace {{ .Release.Namespace }}.
+
+1. Confirm the server's required Secret keys exist:
+
+   MongoDB:    Secret/{{ include "litemcp.mongodbSecretName" . }}, key {{ .Values.mongodb.key }}
+   Better Auth: Secret/{{ include "litemcp.authSecretName" . }}, key {{ .Values.auth.key }}
+
+{{- if and (not .Values.mongodb.uri) (not .Values.auth.secret) (eq .Values.mongodb.existingSecret .Values.auth.existingSecret) }}
+   The chart did not create credentials. For an evaluation install only, one
+   Secret can hold both values:
+
+     kubectl -n {{ .Release.Namespace }} create secret generic {{ .Values.mongodb.existingSecret }} \
+       --from-literal={{ .Values.mongodb.key }}='<mongodb replica-set URI>' \
+       --from-literal={{ .Values.auth.key }}="$(openssl rand -hex 32)"
+{{- end }}
+
+2. Observe the rollout:
+
+     kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "litemcp.server.fullname" . }}
+     kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "litemcp.web.fullname" . }}
+
+{{- if .Values.ingress.enabled }}
+3. Open the configured ingress:
+{{- range .Values.ingress.hosts }}
+     https://{{ .host }}
+{{- end }}
+{{- else }}
+3. Port-forward the web and server services:
+
+     kubectl -n {{ .Release.Namespace }} port-forward service/{{ include "litemcp.web.fullname" . }} 8080:{{ .Values.web.service.port }}
+     kubectl -n {{ .Release.Namespace }} port-forward service/{{ include "litemcp.server.fullname" . }} 8787:{{ .Values.server.service.port }}
+
+   Web:    http://localhost:8080
+   Health: http://localhost:8787/health
+{{- end }}
+
+The chart does not install MongoDB. Production requires a reachable MongoDB
+replica set and operator-managed credentials.

@@ -1,0 +1,18 @@
+{{- if or (hasKey .Values.config.extraData "WEB_ORIGIN") (hasKey .Values.config.extraData "API_ORIGIN") }}
+{{- fail "config.extraData must not override WEB_ORIGIN or API_ORIGIN" }}
+{{- end }}
+{{- if .Values.config.create }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "litemcp.configMapName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "litemcp.labels" . | nindent 4 }}
+data:
+  WEB_ORIGIN: {{ required "config.webOrigin is required" .Values.config.webOrigin | quote }}
+  API_ORIGIN: {{ required "config.apiOrigin is required and must be the client-reachable API/MCP origin" .Values.config.apiOrigin | quote }}
+  {{- with .Values.config.extraData }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+{{- end }}
