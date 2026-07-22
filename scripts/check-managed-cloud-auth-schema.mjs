@@ -33,6 +33,15 @@ const reservedAccountProviderIds = [
   "siwe",
 ];
 
+// This check must work from a clean checkout. The managed-cloud generator imports
+// the auth workspace through its published export, which intentionally points at
+// dist rather than TypeScript source.
+execFileSync("pnpm", ["--filter", "@litemcp/auth", "build"], {
+  cwd: root,
+  env: process.env,
+  stdio: "inherit",
+});
+
 const generatedOutput = execFileSync(
   "pnpm",
   [
