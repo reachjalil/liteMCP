@@ -25,8 +25,21 @@ const profiles = [
   "identity",
   "mcp-compatibility",
   "observability",
+  "open-core",
   "release",
   "security",
+];
+
+const requiredSkills = [
+  "harness-config",
+  "litemcp-deployment-readiness",
+  "litemcp-identity-lifecycle",
+  "litemcp-mcp-compatibility",
+  "litemcp-observability-change",
+  "litemcp-open-core-boundary",
+  "litemcp-release-qualification",
+  "litemcp-security-review",
+  "litemcp-vertical-slice",
 ];
 
 const validateSkills = () => {
@@ -35,9 +48,9 @@ const validateSkills = () => {
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
-  if (skillNames.length < 9) {
+  if (JSON.stringify(skillNames) !== JSON.stringify(requiredSkills)) {
     throw new Error(
-      `Expected at least nine portable skills; found ${skillNames.length}.`
+      `Portable skill set differs: expected ${requiredSkills.join(", ")}; found ${skillNames.join(", ")}.`
     );
   }
 

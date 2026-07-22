@@ -7,6 +7,7 @@ const profiles = [
   "identity",
   "mcp-compatibility",
   "observability",
+  "open-core",
   "release",
   "security",
 ];
