@@ -1,0 +1,4 @@
+interface:
+  display_name: "LiteMCP Release Qualification"
+  short_description: "Qualify immutable release candidates"
+  default_prompt: "Use $litemcp-release-qualification to evaluate this LiteMCP release candidate."

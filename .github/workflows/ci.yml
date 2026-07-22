@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -14,22 +15,23 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: 24.11.1
   PNPM_VERSION: 10.30.2
 
 jobs:
   format:
     name: Format and lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
           version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
@@ -37,89 +39,195 @@ jobs:
 
   types:
     name: Types
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
           version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm types
 
   test:
-    name: Test
-    runs-on: ubuntu-latest
+    name: TypeScript tests
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
           version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Exercise the guarded MongoDB auth-upgrade planner
+        run: pnpm auth:migrate:mongodb:self-test
       - run: pnpm test
+
+  python-sdk:
+    name: Python SDK tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.13"
+      - name: Run dependency-free SDK tests
+        env:
+          PYTHONPATH: packages/sdk-python/src
+        run: python -m unittest discover -s packages/sdk-python/tests -p 'test_*.py'
 
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
           version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
-  managed-cloud-wrangler:
-    name: Managed cloud Wrangler dry runs
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+  harness-config:
+    name: Harness config convergence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
           version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Validate, apply in the disposable checkout, and prove convergence
+        run: pnpm harness:ci
+
+  security-audit:
+    name: Production dependency audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm security:audit
+      - name: Enforce the narrow, expiring build-tool advisory policy
+        run: pnpm security:audit:all
+
+  workflow-policy:
+    name: Workflow security and promotion policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm ci:policy
+
+  managed-cloud-wrangler:
+    name: Managed cloud Wrangler dry runs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Prove Better Auth schema and forward-migration parity
+        run: pnpm managed-cloud:auth-schema:check
+      - name: Exercise the remote migration-window policy without credentials
+        run: pnpm managed-cloud:auth-migration-window -- --self-test
+      - name: Exercise the Durable Object lifecycle policy without credentials
+        run: pnpm managed-cloud:do-lifecycle -- --self-test
       - name: Verify production and staging target isolation
-        run: node scripts/check-managed-cloud-wrangler.mjs
-      - name: Build production managed-cloud static assets
-        run: pnpm --filter @litemcp/managed-cloud build:web
-      - name: Wrangler production dry run
+        run: pnpm managed-cloud:wrangler:check
+      - name: Apply D1 migrations to an isolated local database
+        run: pnpm --filter @litemcp/managed-cloud db:migrate:local
+      - name: Build the exact production Worker and static-asset archive
         run: >-
-          pnpm --filter @litemcp/managed-cloud exec wrangler deploy
-          --dry-run --env= --outdir /tmp/litemcp-wrangler-production
-      - name: Build staging managed-cloud static assets
-        run: pnpm --filter @litemcp/managed-cloud build:web:staging
-      - name: Wrangler staging dry run
+          bash scripts/build-managed-cloud-artifact.sh production
+          "$RUNNER_TEMP/managed-cloud-production"
+      - name: Retain exact production deployment inputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: managed-cloud-artifact-production-${{ github.sha }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/managed-cloud-production/managed-cloud-production.tar.gz
+            ${{ runner.temp }}/managed-cloud-production/managed-cloud-production.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Build the exact staging Worker and static-asset archive
         run: >-
-          pnpm --filter @litemcp/managed-cloud exec wrangler deploy
-          --dry-run --env staging --outdir /tmp/litemcp-wrangler-staging
+          bash scripts/build-managed-cloud-artifact.sh staging
+          "$RUNNER_TEMP/managed-cloud-staging"
+      - name: Retain exact staging deployment inputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: managed-cloud-artifact-staging-${{ github.sha }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/managed-cloud-staging/managed-cloud-staging.tar.gz
+            ${{ runner.temp }}/managed-cloud-staging/managed-cloud-staging.json
+          if-no-files-found: error
+          retention-days: 30
 
   secret-scan:
     name: Secret scan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Scan Git history with Gitleaks
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
@@ -128,10 +236,12 @@ jobs:
   dependency-review:
     name: Dependency review
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Block newly introduced high-severity advisories
         uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
         with:
@@ -139,10 +249,12 @@ jobs:
 
   helm:
     name: Helm
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
       - run: helm lint --strict deploy/helm/litemcp
       - name: Render default and example configurations
@@ -157,22 +269,22 @@ jobs:
 
   compose:
     name: Docker Compose config
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
-    env:
-      BETTER_AUTH_SECRET: ci-only-placeholder-secret-32-characters
-      MONGODB_PASSWORD: ci-only-uri-safe-mongodb-password
-      MONGODB_REPLICA_SET_KEY: ci-only-replica-set-key-32-characters
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: docker compose -f deploy/docker-compose/compose.yaml config --quiet
+        with:
+          persist-credentials: false
+      - run: >-
+          docker compose --env-file deploy/docker-compose/.env.example
+          -f deploy/docker-compose/compose.yaml config --quiet
       - run: bash -n scripts/*.sh
 
   containers:
     name: Container (${{ matrix.component }})
     needs:
       - build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -182,14 +294,168 @@ jobs:
           - web
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
       - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: deploy/docker/${{ matrix.component }}.Dockerfile
           push: false
-          load: false
+          load: true
           provenance: false
           tags: ghcr.io/reachjalil/litemcp-${{ matrix.component }}:ci
           cache-from: type=gha,scope=${{ matrix.component }}
           cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+      - name: Scan the locally built image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/reachjalil/litemcp-${{ matrix.component }}:ci
+          format: table
+          exit-code: "1"
+          ignore-unfixed: false
+          severity: HIGH,CRITICAL
+
+  candidate-images:
+    name: Qualify candidate image (${{ matrix.component }})
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      github.repository == 'reachjalil/liteMCP'
+    needs:
+      - format
+      - types
+      - test
+      - python-sdk
+      - build
+      - harness-config
+      - security-audit
+      - workflow-policy
+      - managed-cloud-wrangler
+      - secret-scan
+      - helm
+      - compose
+      - containers
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        component:
+          - server
+          - web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - name: Sign in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build immutable candidate with attestations
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: deploy/docker/${{ matrix.component }}.Dockerfile
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: ghcr.io/reachjalil/litemcp-${{ matrix.component }}:candidate-${{ github.sha }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/reachjalil/liteMCP
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=Apache-2.0
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+      - name: Scan the exact candidate digest
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/reachjalil/litemcp-${{ matrix.component }}@${{ steps.build.outputs.digest }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: false
+          severity: HIGH,CRITICAL
+      - name: Write immutable image evidence
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: >-
+          node scripts/verify-image-evidence.mjs write
+          "$RUNNER_TEMP/image-evidence-${{ matrix.component }}.json"
+          "$GITHUB_REPOSITORY"
+          "$GITHUB_SHA"
+          "$GITHUB_RUN_ID"
+          "$GITHUB_RUN_ATTEMPT"
+          "${{ matrix.component }}"
+          "$IMAGE_DIGEST"
+      - name: Upload immutable image evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: image-evidence-${{ matrix.component }}-${{ github.sha }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/image-evidence-${{ matrix.component }}.json
+          if-no-files-found: error
+          retention-days: 30
+
+  required:
+    name: Required checks
+    if: always()
+    needs:
+      - format
+      - types
+      - test
+      - python-sdk
+      - build
+      - harness-config
+      - security-audit
+      - workflow-policy
+      - managed-cloud-wrangler
+      - secret-scan
+      - dependency-review
+      - helm
+      - compose
+      - containers
+      - candidate-images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every mandatory job
+        env:
+          CI_EVENT: ${{ github.event_name }}
+          CI_REPOSITORY: ${{ github.repository }}
+          JOB_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node --input-type=module - <<'NODE'
+          const results = JSON.parse(process.env.JOB_RESULTS);
+          const failures = Object.entries(results).filter(([name, value]) => {
+            if (
+              name === "dependency-review" &&
+              value.result === "skipped" &&
+              process.env.CI_EVENT !== "pull_request"
+            ) {
+              return false;
+            }
+            if (
+              name === "candidate-images" &&
+              value.result === "skipped" &&
+              (process.env.CI_EVENT !== "push" ||
+                process.env.CI_REPOSITORY !== "reachjalil/liteMCP")
+            ) {
+              return false;
+            }
+            return value.result !== "success";
+          });
+          if (failures.length > 0) {
+            throw new Error(
+              `Mandatory jobs failed or were skipped: ${failures
+                .map(([name, value]) => `${name}=${value.result}`)
+                .join(", ")}`
+            );
+          }
+          console.log("PASS  all mandatory CI jobs succeeded");
+          NODE

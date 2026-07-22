@@ -5,6 +5,9 @@
   "type": "module",
   "license": "Apache-2.0",
   "scripts": {
+    "auth:migrate:1.7:apply": "node scripts/migrate-better-auth-1-7-mongodb.mjs apply",
+    "auth:migrate:1.7:check": "node scripts/migrate-better-auth-1-7-mongodb.mjs check",
+    "auth:migrate:1.7:self-test": "node scripts/migrate-better-auth-1-7-mongodb.mjs --self-test",
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",

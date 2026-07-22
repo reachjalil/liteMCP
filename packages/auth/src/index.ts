@@ -2,6 +2,7 @@ import { apiKey } from "@better-auth/api-key";
 import { scim } from "@better-auth/scim";
 import { sso } from "@better-auth/sso";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin, bearer, jwt, organization, twoFactor } from "better-auth/plugins";
 
 const encoder = new TextEncoder();
@@ -13,6 +14,49 @@ const hashSecret = async (value: string) => {
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 };
+
+/** Better Auth 1.7 reserves this namespace for organization-scoped SCIM accounts. */
+export const isReservedScimAccountProviderId = (providerId: unknown) =>
+  typeof providerId === "string" && providerId.startsWith("scim:");
+
+const builtInAccountProviderIds = new Set([
+  "credential",
+  "email-otp",
+  "magic-link",
+  "phone-number",
+  "anonymous",
+  "siwe",
+]);
+
+export const isReservedBuiltInAccountProviderId = (providerId: unknown) =>
+  typeof providerId === "string" && builtInAccountProviderIds.has(providerId);
+
+type ProviderNamespaceAdapter = {
+  findOne(input: {
+    model: "ssoProvider";
+    where: [{ field: "providerId"; value: string }];
+  }): Promise<unknown>;
+};
+
+const findSsoProviderById = (adapter: ProviderNamespaceAdapter, providerId: string) =>
+  adapter.findOne({
+    model: "ssoProvider",
+    where: [{ field: "providerId", value: providerId }],
+  });
+
+const enforceProviderNamespaces = createAuthMiddleware(async (context) => {
+  if (context.path !== "/sso/register") return;
+  const providerId = (context.body as { providerId?: unknown } | undefined)?.providerId;
+  if (typeof providerId !== "string") return;
+  if (isReservedScimAccountProviderId(providerId)) {
+    throw new APIError("UNPROCESSABLE_ENTITY", {
+      message: "SSO provider IDs cannot use the reserved SCIM account namespace.",
+    });
+  }
+  // The pinned SSO plugin checks raw SCIM provider-ID collisions after its
+  // session and organization-admin checks. Do not move that stateful lookup
+  // into this global hook: global hooks run before endpoint authorization.
+});
 
 export type EmailMessage = {
   to: string;
@@ -173,6 +217,31 @@ export type LiteMcpAuthOptions = {
 
 export type LiteMcpAuthPlugin = NonNullable<BetterAuthOptions["plugins"]>[number];
 
+const createProviderNamespaceGuard = () => {
+  let adapter: ProviderNamespaceAdapter | undefined;
+  const plugin: LiteMcpAuthPlugin = {
+    id: "litemcp-provider-namespace-guard",
+    init(context) {
+      adapter = context.adapter as ProviderNamespaceAdapter;
+    },
+  };
+
+  return {
+    plugin,
+    async canGenerateScimToken(input: { providerId: string; organizationId: string }) {
+      if (isReservedBuiltInAccountProviderId(input.providerId) || !adapter) {
+        return false;
+      }
+      const accountProviderId = `scim:${input.organizationId}:${input.providerId}`;
+      const [rawProviderCollision, accountProviderCollision] = await Promise.all([
+        findSsoProviderById(adapter, input.providerId),
+        findSsoProviderById(adapter, accountProviderId),
+      ]);
+      return !rawProviderCollision && !accountProviderCollision;
+    },
+  };
+};
+
 export type LiteMcpAuth = {
   handler(request: Request): Promise<Response>;
   api: {
@@ -207,6 +276,7 @@ export const createLiteMcpAuthConfiguration = (
         options.applicationURL ?? options.trustedOrigins[0] ?? options.baseURL
       )
     : undefined;
+  const providerNamespaceGuard = createProviderNamespaceGuard();
   const corePlugins: LiteMcpAuthPlugin[] = [
     organization({
       allowUserToCreateOrganization: signupsEnabled,
@@ -238,9 +308,10 @@ export const createLiteMcpAuthConfiguration = (
         requestTTL: 5 * 60 * 1_000,
       },
     }),
+    providerNamespaceGuard.plugin,
     scim({
       requiredRole: ["owner", "admin"],
-      providerOwnership: { enabled: true },
+      canGenerateToken: providerNamespaceGuard.canGenerateScimToken,
       storeSCIMToken: { hash: hashSecret },
     }),
   ];
@@ -302,6 +373,9 @@ export const createLiteMcpAuthConfiguration = (
         "/sign-up/email": { window: 300, max: 5 },
         "/sso/register": { window: 300, max: 3 },
       },
+    },
+    hooks: {
+      before: enforceProviderNamespaces,
     },
     advanced: {
       useSecureCookies: !demoMode,

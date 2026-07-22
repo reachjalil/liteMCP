@@ -115,6 +115,36 @@ Open [http://localhost:4321](http://localhost:4321), then choose **Open console*
 The demo is visibly labeled and sends fixed `org_demo` authorization headers;
 it is disabled by default in production configurations.
 
+Agent configuration is generated from the reviewed `.harness` source for both
+Codex (`.agents`) and Claude (`.claude`). On a fresh checkout, or after pulling
+a change that touches `.harness`, regenerate the ignored live surfaces:
+
+```bash
+pnpm setup:harness
+```
+
+For changes to agent instructions, skills, or profiles, edit `.harness`, run
+`pnpm harness:validate`, preview with `pnpm harness:preview`, then apply only
+after reviewing the plan with `pnpm harness:activate`. A second preview must
+converge to stable `keep` actions. Select a temporary focus without changing the
+skill catalog:
+
+```bash
+pnpm harness:profile:list
+pnpm harness:profile security
+pnpm harness:preview
+pnpm harness:activate
+pnpm harness:preview
+pnpm harness:profile:clear
+pnpm harness:preview
+pnpm harness:activate
+pnpm harness:preview
+```
+
+The available profiles focus agents on security, deployment, release,
+observability, identity, MCP compatibility, or fast vertical-slice iteration.
+The selector `.harnessProfile` is local and intentionally not committed.
+
 In another terminal, prove that two different upstream transports are exposed
 through one scoped endpoint:
 
@@ -163,16 +193,21 @@ pnpm --filter @litemcp/managed-cloud db:migrate:local
 pnpm managed-cloud:dev
 ```
 
-For a fresh account, authenticate Wrangler and upload an inactive Worker
-version first. The version upload provisions the draft KV and D1 bindings
-without directing production traffic to an unmigrated database:
+For a fresh account, create the account-owned KV and D1 resources explicitly,
+check in their reviewed IDs, and apply the Durable Object lifecycle with
+`wrangler deploy` from the exact verified CI payload. Cloudflare does not allow
+a first deployment or a pending Durable Object lifecycle migration through
+`wrangler versions upload`. The lifecycle operation requires secure first-deploy
+secrets and a full maintenance/write-freeze boundary; follow the dedicated
+[Durable Object lifecycle runbook](./docs/operations/cloudflare-durable-object-lifecycle.md).
+After that runbook's remote check passes, configure the runtime secrets and D1
+schema for the explicit target:
 
 ```bash
 pnpm --filter @litemcp/managed-cloud exec wrangler login
 pnpm --filter @litemcp/managed-cloud exec wrangler whoami
-pnpm --filter @litemcp/web build
-pnpm --filter @litemcp/managed-cloud exec wrangler versions upload
-pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put BETTER_AUTH_SECRET
+pnpm managed-cloud:do-lifecycle -- --env production
+pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put BETTER_AUTH_SECRET --env=
 pnpm --filter @litemcp/managed-cloud db:migrate:remote
 ```
 
@@ -183,18 +218,35 @@ name `litemcpcomposer.com`. Then deploy and smoke-test the site, auth, API, and
 a scoped MCP session:
 
 ```bash
-pnpm managed-cloud:deploy
+pnpm --filter @litemcp/managed-cloud exec wrangler triggers deploy --env=
+# Then dispatch deploy-managed-cloud-staging.yml and promote its accepted SHA
+# with deploy-managed-cloud.yml.
 ```
+
+Worker version promotion intentionally does not manage routes/custom domains;
+apply trigger changes as their own reviewed mutation and verify DNS/TLS plus the
+exact origin before setting a resource-ready marker. The marker also attests
+that the separately applied lifecycle operation reached the final checked-in
+migration tag; every promotion verifies that state remotely before upload.
 
 The upload/deploy commands are external mutations, not validation commands. A
 production rollout must apply and accept the current Durable Object/D1
 migrations; per-document serialization does not remove the multi-document and
 external-dispatch limits described in the known limitations.
 
-After one-time resource bootstrap, `.github/workflows/deploy-managed-cloud.yml`
-can deploy green `main` checkpoints when the protected GitHub environment has
-Cloudflare credentials, an exact HTTPS origin, and the explicit resource-ready
-and auto-deploy variables. It remains disabled until those values are supplied.
+After the one-time lifecycle/resource bootstrap,
+`.github/workflows/deploy-managed-cloud-staging.yml` can deploy an exact
+main-branch SHA only after the matching CI run succeeds. Staging requires both
+public health/readiness and an authenticated read-only MCP smoke, then retains
+non-secret acceptance evidence. Production promotion is an explicit dispatch
+of `.github/workflows/deploy-managed-cloud.yml` with that exact SHA and staging
+run ID; it verifies the evidence before entering the production environment
+declared by the workflow. Both workflows remain disabled until the
+customer-owned reference deployment variables, resource IDs, credentials,
+origins, and smoke tuple are configured. GitHub environment reviewers,
+deployment-branch policies, and the `Required checks` branch rule are
+repository-admin controls: this repository validates the workflow contract,
+but the current upstream repository has not configured those remote protections.
 
 ### Docker Compose
 
@@ -257,15 +309,39 @@ deploy                   Docker Compose, images, and Helm chart
 
 ```bash
 pnpm check
+pnpm python:test
+pnpm harness:ci
+pnpm security:audit
+pnpm security:audit:all
+pnpm ci:policy
+pnpm managed-cloud:auth-schema:check
+pnpm auth:migrate:mongodb:self-test
 pnpm helm:lint
 pnpm helm:template
 ```
 
-CI installs with a frozen lockfile, checks formatting and types, runs unit and
-integration tests, builds every package, validates the Cloudflare reference
-Wrangler dry-run bundle, and renders Docker Compose and Helm configuration. A
-separate workflow publishes validated edge images to GHCR after CI; the
-implementation status records whether that remote workflow has actually
+CI installs with a frozen lockfile, checks formatting/types, runs TypeScript and
+Python SDK tests, builds every package, applies and converges Harness config in
+the disposable checkout, enforces production dependency and workflow policy
+gates, proves Better Auth's generated D1 schema and guarded MongoDB upgrade
+planner, validates local D1 migrations plus Cloudflare dry runs, scans secrets,
+dependencies, and exact container digests, and renders Docker Compose and Helm configuration. A single
+required-check aggregator prevents an optional/skipped job from masking a
+failed mandatory gate. The full dependency graph allows only reviewed,
+path-bound, expiring exceptions in
+`.github/dependency-audit-allowlist.json`; production dependencies have no such
+exception. Canonical-repository main CI pushes run-and-attempt-qualified
+candidate images with SBOM and provenance, scans their exact digests, and
+retains run-bound evidence; forks still build and scan both images locally
+without attempting to write the upstream registry. A serialized publisher then
+promotes those digests without rebuilding, refuses to supersede a newer
+successful main run when qualification or the immediate pre-`edge` freshness
+check observes one, refuses to change an existing `sha-<commit>` alias to
+another digest, and verifies that alias plus `edge` after each registry write.
+GHCR cannot atomically update the server and web repositories, so a partial
+`edge` update and the residual API-read/registry-write race remain visible,
+rerunnable operational boundaries. The
+implementation status records whether this new remote workflow has actually
 passed. Kubernetes runtime smoke coverage is intentionally not overstated.
 
 ## Product and security documentation

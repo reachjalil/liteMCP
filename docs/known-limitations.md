@@ -49,8 +49,18 @@ production-ready enterprise release. This list is intentionally conservative.
   target and commits the authority pointer last. It is still a sequence of
   document writes rather than an atomic restore; failure recovery and live
   managed-cloud-to-Mongo portability have not been proved.
-- Mongo backup/restore, migration, change-stream invalidation, adapter parity,
-  and cross-target export/import have not passed a compatibility suite.
+- A guarded Better Auth 1.7 MongoDB upgrade utility rekeys organization-scoped
+  SCIM providers and their provisioned accounts transactionally with majority
+  write concern, uses resumable data/index completion phases, verifies the new
+  exact uniqueness indexes, and removes the obsolete global provider-ID
+  uniqueness. It fails closed when a legacy SCIM ID overlaps a built-in Better
+  Auth account provider because those account rows cannot be classified safely.
+  Its planner/index invariants have local self-tests. It has not run against a
+  real restored MongoDB dataset, so backup/restore, migration, change-stream
+  invalidation, adapter parity, and cross-target export/import still have no
+  environment acceptance. Accounts left after their 1.6 provider connection
+  was deleted have no trustworthy automatic organization mapping and require
+  operator-held historical identity evidence.
 
 ## Authentication and enterprise identity
 
@@ -58,6 +68,12 @@ production-ready enterprise release. This list is intentionally conservative.
   OIDC/SAML SSO, and SCIM plugins. D1 migrations and the Mongo composition
   exist, but provider onboarding and production flows have not passed live
   browser/provider tests.
+- Runtime provider creation rejects built-in IDs, the reserved `scim:` account
+  namespace, and existing cross-plugin SSO/SCIM collisions after the relevant
+  membership/role checks. Those cross-collection existence checks are not one
+  atomic uniqueness claim, so concurrent SSO and SCIM provider creation can
+  still race. Administrators must serialize identity-provider mutations until
+  a shared transactional namespace-claim store is implemented and accepted.
 - A Resend-compatible delivery seam is wired to verification, password-reset,
   and invitation callbacks, and production signup refuses to open without an
   email sender. No real message delivery, bounce/abuse handling, sender-domain
@@ -243,21 +259,54 @@ production-ready enterprise release. This list is intentionally conservative.
 - Tool JSON Schemas use an isolated validator, reject external references, and
   validate standard formats. The supported-schema compatibility surface still
   needs broader fuzzing and resource limits for pathological schemas.
-- GHCR publication produces BuildKit SBOM and provenance attestations for both
-  images, and the `edge` OCI indexes resolve anonymously. No penetration test,
-  external security review, supply-chain incident exercise, signed or tagged
-  immutable release, vulnerability scan, or reproducible build proof is
-  recorded.
-- `pnpm audit` reports the high-severity `@better-auth/scim` owner-binding
-  advisory (`GHSA-j8v8-g9cx-5qf4`). LiteMCP enables provider ownership and
-  restricts provider creation to owner/admin roles, but the first patched
-  upstream release is still a `1.7` prerelease. Moving the Better Auth stack to
-  that release requires an explicit compatibility and migration pass; this
-  remains a production-release blocker.
+- Historical GHCR publication produced BuildKit SBOM and provenance
+  attestations for both images, and the old `edge` OCI indexes resolve
+  anonymously. The working tree instead builds run-and-attempt-qualified
+  candidates in canonical-repository CI, scans each exact digest, refuses to
+  change an existing `sha-<commit>` alias to another digest, and promotes
+  aliases without rebuilding, but that new remote path has not run. Forks build
+  and scan locally without writing the upstream registry. GHCR cannot atomically
+  update the server and web repositories; a second-alias failure can leave a
+  visible partial `edge` update until the serialized workflow is rerun. The
+  publisher rechecks the latest successful main CI run immediately before
+  moving `edge`, but that GitHub API read and the two GHCR writes are not one
+  transaction; a newer CI run can still complete in the residual window, and
+  its queued publisher must advance the aliases. If that later publisher fails
+  or is replaced while pending, `edge` can remain stale until a rerun. No
+  penetration test, external security review, supply-chain incident exercise,
+  signed release, or reproducible build proof is recorded.
+- The Better Auth stack is pinned together at `1.7.0-rc.1`, which includes the
+  upstream fix for the `@better-auth/scim` owner-binding advisory
+  (`GHSA-j8v8-g9cx-5qf4`). On 2026-07-22 the production dependency audit and
+  focused auth type/tests passed after the dependency upgrade. A generated-
+  schema parity check now proves fresh and 1.6-to-1.7 D1 migrations, including
+  provider/account rekeying and fail-before-mutation behavior for unmappable,
+  reserved, or colliding provider rows. The MongoDB planner has local tests. The
+  dependency is still a prerelease and neither migration has live SSO/SCIM
+  provider or restored-data acceptance. Kysely is explicitly held at the
+  supported `0.28.17` runtime
+  because `0.29.4` moved `DEFAULT_MIGRATION_TABLE` and
+  `DEFAULT_MIGRATION_LOCK_TABLE` out of its root export while this Better Auth
+  release candidate still imports them there; the Worker dry-run covers that
+  compatibility pin until upstream packages converge.
+- The full development dependency audit reports
+  `GHSA-f88m-g3jw-g9cj` through
+  `wrangler@4.113.0 > miniflare@4.20260721.0 > sharp@0.34.5`.
+  Production dependencies are unaffected and pass the high-severity audit.
+  CI permits only that exact build-tool path/version through the reviewed,
+  expiring exception in `.github/dependency-audit-allowlist.json`; any new path,
+  version, high advisory, or an exception surviving 2026-08-15 fails the gate.
 - LiteMCP Composer claims no SOC 2, ISO 27001, HIPAA, FedRAMP, GDPR
   certification, or other certification.
 
 ## Operations and deployment
+
+- The workflows declare `managed-cloud-staging` and `managed-cloud`
+  environments, but the current GitHub repository has no environment protection
+  rules, deployment-branch policy, `main` branch protection, or ruleset. The
+  checked-in preflight/evidence policy is not a substitute for repository-admin
+  required reviewers and the `Required checks` branch rule. Configure those
+  remote controls before enabling customer-owned reference deployment.
 
 - The managed-cloud public preview is deployed at
   [`litemcpcomposer.com`](https://litemcpcomposer.com). Wrangler deployment,
@@ -267,10 +316,35 @@ production-ready enterprise release. This list is intentionally conservative.
   That recorded Worker version predates the current signup, OAuth, authority,
   lifecycle, quota, and console changes. The current working tree and its new D1
   and Durable Object migrations have not been deployed there.
-- An isolated staging Worker configuration and gated deployment workflow are
-  checked in, but staging KV/D1 resource IDs are intentionally absent and no
-  staging deployment has run. Production and staging both keep signup disabled
-  by default.
+- An isolated staging Worker configuration and an exact-CI-artifact
+  staging-to-production chain are checked in. CI builds separate target archives
+  once, and the workflows bind their SHA-256 digests, Worker version UUIDs/tags,
+  migration sets, targets, attempts, and smoke results into evidence. This new
+  remote path has not run, and the production/staging archives intentionally
+  differ because their origins and bindings differ. Staging KV/D1 resource IDs remain
+  intentionally absent and no staging deployment has run, so the strict deploy
+  preflight still blocks mutation. The existing production Worker is not at the
+  final checked-in Durable Object migration tag, and staging has no first Worker;
+  ordinary version promotion now fails closed until each target completes the
+  separately reviewed exact-CI-artifact lifecycle operation. Production and
+  staging both keep signup disabled by default. Staging rechecks
+  latest-successful CI after environment
+  admission, but the API read and subsequent Cloudflare mutations are not one
+  transaction; a newer CI run can still complete in the residual window.
+- Wrangler `versions upload`/`versions deploy` does not apply routes, custom
+  domains, or other triggers. The workflows intentionally leave those
+  separately scoped mutations to account operators; the resource-ready marker is only an
+  attestation that the reviewed trigger, DNS/TLS, and exact origin already
+  exist. Misconfigured or drifted triggers fail public smoke but have no
+  automated reconciliation path.
+- A first Worker and Durable Object lifecycle changes require `wrangler deploy`,
+  not `versions upload`. That privileged operation is intentionally outside the
+  routine workflow token and has not run for the working tree. It changes the
+  active Worker immediately, cannot roll back across the lifecycle boundary,
+  and therefore requires the exact CI archive, secure first-deploy secrets,
+  maintenance/write-freeze controls, and forward recovery. The routine
+  workflows now verify the active migration tag and bindings through a
+  read-only Cloudflare settings lookup before any upload.
 - First-user signup/email/bootstrap, privileged control-plane operations, MCP
   initialize/list/call, approval/OAuth, audit correlation, SSO/SCIM, rollback,
   load, and external security acceptance have not passed on staging or the

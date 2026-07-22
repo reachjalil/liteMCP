@@ -1,0 +1,4 @@
+interface:
+  display_name: "LiteMCP Identity Lifecycle"
+  short_description: "Change identity and revocation safely"
+  default_prompt: "Use $litemcp-identity-lifecycle to implement or review this identity lifecycle change."

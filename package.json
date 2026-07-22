@@ -21,9 +21,26 @@
     "test": "turbo run test",
     "test:coverage": "turbo run test:coverage",
     "types": "turbo run types",
+    "harness:validate": "harnessc validate",
+    "harness:preview": "harnessc activate",
+    "harness:activate": "harnessc activate --yes",
+    "harness:ci": "node scripts/check-harness-convergence.mjs",
+    "harness:profile": "node .harness/scripts/select-profile.mjs",
+    "harness:profile:list": "node .harness/scripts/select-profile.mjs list",
+    "harness:profile:clear": "node .harness/scripts/select-profile.mjs clear",
+    "setup:harness": "pnpm harness:validate && pnpm harness:activate",
+    "update:harness": "pnpm setup:harness",
+    "ci:policy": "node scripts/check-ci-policy.mjs && node scripts/verify-workflow-evidence.mjs --self-test && node scripts/verify-image-evidence.mjs --self-test && node scripts/verify-managed-cloud-artifact.mjs --self-test",
+    "python:test": "PYTHONPATH=packages/sdk-python/src python3 -m unittest discover -s packages/sdk-python/tests -p 'test_*.py'",
+    "security:audit": "pnpm audit --prod --audit-level high",
+    "security:audit:all": "node scripts/check-dependency-audit.mjs",
+    "auth:migrate:mongodb:self-test": "pnpm --filter @litemcp/server auth:migrate:1.7:self-test",
     "managed-cloud:dev": "pnpm --filter @litemcp/managed-cloud dev",
-    "managed-cloud:deploy": "pnpm --filter @litemcp/managed-cloud deploy",
-    "managed-cloud:deploy:staging": "pnpm --filter @litemcp/managed-cloud deploy:staging",
+    "managed-cloud:deploy": "node scripts/guard-managed-cloud-deploy.mjs production",
+    "managed-cloud:deploy:staging": "node scripts/guard-managed-cloud-deploy.mjs staging",
+    "managed-cloud:auth-migration-window": "node scripts/check-managed-cloud-auth-migration-window.mjs",
+    "managed-cloud:auth-schema:check": "node scripts/check-managed-cloud-auth-schema.mjs",
+    "managed-cloud:do-lifecycle": "node scripts/check-managed-cloud-do-lifecycle.mjs",
     "managed-cloud:wrangler:check": "node scripts/check-managed-cloud-wrangler.mjs",
     "docker:up": "docker compose -f deploy/docker-compose/compose.yaml up --build",
     "docker:down": "docker compose -f deploy/docker-compose/compose.yaml down",
@@ -33,12 +50,17 @@
   "devDependencies": {
     "@biomejs/biome": "catalog:",
     "@types/node": "catalog:",
-    "turbo": "catalog:",
+    "harnessc": "1.0.0-alpha.10",
     "tsx": "catalog:",
+    "turbo": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "yaml": "catalog:"
   },
   "pnpm": {
+    "overrides": {
+      "kysely": "0.28.17"
+    },
     "onlyBuiltDependencies": [
       "esbuild",
       "sharp",

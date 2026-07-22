@@ -21,3 +21,17 @@ test-results/
 *.crt
 *.tgz
 /apps/managed-cloud/worker-configuration.d.ts
+
+# Harness-generated agent surfaces and root instructions
+/.agents/
+/.claude/*
+!/.claude/.harnessIgnore
+/AGENTS.md
+/CLAUDE.md
+
+# Local Harness profile selection
+/.harnessProfile
+
+# Harness source remains reviewed and tracked
+!/.harness/
+!/.harness/**

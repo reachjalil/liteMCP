@@ -1,0 +1,4 @@
+interface:
+  display_name: "LiteMCP Deployment Readiness"
+  short_description: "Qualify deployment configuration safely"
+  default_prompt: "Use $litemcp-deployment-readiness to qualify this LiteMCP deployment change."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "LiteMCP Vertical Slice"
+  short_description: "Ship small complete product iterations"
+  default_prompt: "Use $litemcp-vertical-slice to plan and implement the smallest complete LiteMCP iteration."

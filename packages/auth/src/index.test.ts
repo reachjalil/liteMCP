@@ -5,6 +5,8 @@ import {
   createLiteMcpAuthConfiguration,
   createResendEmailSender,
   type EmailMessage,
+  isReservedBuiltInAccountProviderId,
+  isReservedScimAccountProviderId,
   type LiteMcpAuthPlugin,
 } from "./index.js";
 
@@ -13,6 +15,36 @@ const baseOptions = {
   baseURL: "https://api.example.com",
   secret: "a-production-secret-with-at-least-32-characters",
   trustedOrigins: ["https://app.example.com"],
+};
+
+const providerNamespaceAdapter = (collisions: Set<string>) => {
+  const findOne = vi.fn(
+    async (input: {
+      model: "ssoProvider";
+      where: [{ field: "providerId"; value: string }];
+    }) =>
+      collisions.has(`${input.model}:${input.where[0].value}`)
+        ? { id: "collision" }
+        : null
+  );
+  return { adapter: { findOne }, findOne };
+};
+
+const providerNamespaceCallbacks = async (
+  configuration: ReturnType<typeof createLiteMcpAuthConfiguration>,
+  adapter: { findOne: ReturnType<typeof vi.fn> }
+) => {
+  const guard = configuration.plugins?.find(
+    (plugin) => plugin.id === "litemcp-provider-namespace-guard"
+  );
+  await guard?.init?.({ adapter } as never);
+  const scimPlugin = configuration.plugins?.find((plugin) => plugin.id === "scim");
+  return scimPlugin?.options?.canGenerateToken as (input: {
+    providerId: string;
+    organizationId: string;
+    user: never;
+    member: never;
+  }) => Promise<boolean>;
 };
 
 describe("createLiteMcpAuth", () => {
@@ -112,6 +144,132 @@ describe("createLiteMcpAuth", () => {
         additionalPlugins: [{ id: "hosted" }, { id: "hosted" }],
       })
     ).toThrow("plugin id hosted is already configured");
+  });
+
+  it("reserves Better Auth's organization-scoped SCIM account namespace", async () => {
+    expect(isReservedScimAccountProviderId("scim:organization-a:entra")).toBe(true);
+    expect(isReservedScimAccountProviderId("entra")).toBe(false);
+    expect(isReservedScimAccountProviderId(undefined)).toBe(false);
+    const configuration = createLiteMcpAuthConfiguration(baseOptions);
+    const before = configuration.hooks?.before;
+    const { adapter, findOne } = providerNamespaceAdapter(new Set());
+    await expect(
+      before?.({
+        path: "/sso/register",
+        body: { providerId: "scim:organization-a:entra" },
+        context: { adapter },
+      } as never)
+    ).rejects.toThrow("reserved SCIM account namespace");
+    expect(findOne).not.toHaveBeenCalled();
+  });
+
+  it("keeps the pinned SSO plugin's raw SCIM collision check behind authorization", async () => {
+    const configuration = createLiteMcpAuthConfiguration(baseOptions);
+    const ssoPlugin = configuration.plugins?.find((plugin) => plugin.id === "sso");
+    const registerSSOProvider = ssoPlugin?.endpoints?.registerSSOProvider;
+    if (!registerSSOProvider)
+      throw new Error("Pinned SSO registration endpoint missing");
+    const now = new Date("2026-01-01T00:00:00.000Z");
+    const findOne = vi.fn(
+      async (input: { model: string; where: { field: string; value: string }[] }) => {
+        if (input.model === "member") return { role: "owner" };
+        if (input.model === "scimProvider") return { id: "scim-provider" };
+        return null;
+      }
+    );
+
+    await expect(
+      registerSSOProvider({
+        path: "/sso/register",
+        body: {
+          providerId: "entra",
+          issuer: "https://idp.example.com",
+          domain: "example.com",
+          organizationId: "organization-a",
+        },
+        context: {
+          session: {
+            session: {
+              id: "session-a",
+              createdAt: now,
+              updatedAt: now,
+              userId: "user-a",
+              expiresAt: new Date("2026-01-02T00:00:00.000Z"),
+              token: "test-session-token",
+            },
+            user: {
+              id: "user-a",
+              createdAt: now,
+              updatedAt: now,
+              email: "admin@example.com",
+              emailVerified: true,
+              name: "Admin",
+            },
+          },
+          adapter: { findMany: vi.fn(async () => []), findOne },
+          hasPlugin: (id: string) => id === "organization" || id === "scim",
+          options: configuration,
+          socialProviders: [],
+          trustedProviders: [],
+          logger: {
+            warn: vi.fn(),
+            info: vi.fn(),
+            error: vi.fn(),
+          },
+        },
+      } as never)
+    ).rejects.toThrow("already used by a SCIM provider");
+    expect(findOne).toHaveBeenNthCalledWith(1, {
+      model: "member",
+      where: [
+        { field: "userId", value: "user-a" },
+        { field: "organizationId", value: "organization-a" },
+      ],
+    });
+    expect(findOne).toHaveBeenNthCalledWith(2, {
+      model: "scimProvider",
+      where: [{ field: "providerId", value: "entra" }],
+    });
+  });
+
+  it("keeps SCIM provider IDs out of built-in and SSO account namespaces", async () => {
+    expect(isReservedBuiltInAccountProviderId("credential")).toBe(true);
+    expect(isReservedBuiltInAccountProviderId("email-otp")).toBe(true);
+    expect(isReservedBuiltInAccountProviderId("entra")).toBe(false);
+
+    const collisions = new Set<string>();
+    const { adapter, findOne } = providerNamespaceAdapter(collisions);
+    const canGenerateToken = await providerNamespaceCallbacks(
+      createLiteMcpAuthConfiguration(baseOptions),
+      adapter
+    );
+    const input = {
+      providerId: "entra",
+      organizationId: "organization-a",
+      user: undefined as never,
+      member: undefined as never,
+    };
+
+    await expect(
+      canGenerateToken({ ...input, providerId: "credential" })
+    ).resolves.toBe(false);
+    expect(findOne).not.toHaveBeenCalled();
+
+    collisions.add("ssoProvider:entra");
+    await expect(canGenerateToken(input)).resolves.toBe(false);
+    collisions.clear();
+    collisions.add("ssoProvider:scim:organization-a:entra");
+    await expect(canGenerateToken(input)).resolves.toBe(false);
+    collisions.clear();
+    await expect(canGenerateToken(input)).resolves.toBe(true);
+    expect(findOne).toHaveBeenCalledWith({
+      model: "ssoProvider",
+      where: [{ field: "providerId", value: "entra" }],
+    });
+    expect(findOne).toHaveBeenCalledWith({
+      model: "ssoProvider",
+      where: [{ field: "providerId", value: "scim:organization-a:entra" }],
+    });
   });
 });
 

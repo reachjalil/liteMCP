@@ -1,0 +1,2 @@
+# Preserve Claude's machine-local settings and trust state outside projection.
+settings.local.json

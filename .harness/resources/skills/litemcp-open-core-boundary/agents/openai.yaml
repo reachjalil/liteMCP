@@ -1,0 +1,4 @@
+interface:
+  display_name: "LiteMCP Open-Core Boundary"
+  short_description: "Protect the public and private seam"
+  default_prompt: "Use $litemcp-open-core-boundary to assess this change against the LiteMCP open-core boundary."

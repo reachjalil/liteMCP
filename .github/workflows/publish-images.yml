@@ -10,32 +10,104 @@ on:
       - completed
 
 permissions:
+  actions: read
   contents: read
   packages: write
-  id-token: write
 
 concurrency:
-  group: publish-images-${{ github.event.workflow_run.head_sha }}
+  group: publish-images-edge
   cancel-in-progress: false
 
 jobs:
-  publish:
-    name: Publish ${{ matrix.component }}
-    if: github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    strategy:
-      fail-fast: false
-      matrix:
-        component:
-          - server
-          - web
+  promote:
+    name: Promote qualified image digests
+    if: >-
+      github.repository == 'reachjalil/liteMCP' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
-      - name: Check out the validated revision
+      - name: Check out trusted promotion controls
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-      - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Bind the triggering run to trusted CI
+        env:
+          CANDIDATE_SHA: ${{ github.event.workflow_run.head_sha }}
+          CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          CI_RUN_ID: ${{ github.event.workflow_run.id }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CI_RUN_ID" \
+            >"$RUNNER_TEMP/ci-run.json"
+          node scripts/verify-workflow-evidence.mjs ci \
+            "$RUNNER_TEMP/ci-run.json" \
+            "$CANDIDATE_SHA" \
+            "$CI_RUN_ID" \
+            "$GITHUB_REPOSITORY" \
+            "$CI_RUN_ATTEMPT"
+      - name: Refuse to supersede a newer successful main CI run
+        env:
+          CANDIDATE_SHA: ${{ github.event.workflow_run.head_sha }}
+          CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          CI_RUN_ID: ${{ github.event.workflow_run.id }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api -X GET \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+            -f branch=main \
+            -f event=push \
+            -f status=success \
+            -f per_page=1 \
+            >"$RUNNER_TEMP/latest-successful-ci.json"
+          node scripts/verify-workflow-evidence.mjs latest \
+            "$RUNNER_TEMP/latest-successful-ci.json" \
+            "$CANDIDATE_SHA" \
+            "$CI_RUN_ID" \
+            "$CI_RUN_ATTEMPT"
+      - name: Download exact-attempt image evidence
+        env:
+          CANDIDATE_SHA: ${{ github.event.workflow_run.head_sha }}
+          CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          CI_RUN_ID: ${{ github.event.workflow_run.id }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/image-evidence"
+          for component in server web; do
+            gh run download "$CI_RUN_ID" \
+              --repo "$GITHUB_REPOSITORY" \
+              --name "image-evidence-$component-$CANDIDATE_SHA-run-$CI_RUN_ID-attempt-$CI_RUN_ATTEMPT" \
+              --dir "$RUNNER_TEMP/image-evidence/$component"
+          done
+      - name: Validate image evidence
+        id: evidence
+        env:
+          CANDIDATE_SHA: ${{ github.event.workflow_run.head_sha }}
+          CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          CI_RUN_ID: ${{ github.event.workflow_run.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for component in server web; do
+            digest="$(node scripts/verify-image-evidence.mjs verify \
+              "$RUNNER_TEMP/image-evidence/$component/image-evidence-$component.json" \
+              "$GITHUB_REPOSITORY" \
+              "$CANDIDATE_SHA" \
+              "$CI_RUN_ID" \
+              "$CI_RUN_ATTEMPT" \
+              "$component")"
+            printf '%s_digest=%s\n' "$component" "$digest" >>"$GITHUB_OUTPUT"
+          done
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
       - name: Sign in to GHCR
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
@@ -43,21 +115,98 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and publish the validated image
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: .
-          file: deploy/docker/${{ matrix.component }}.Dockerfile
-          push: true
-          provenance: mode=max
-          sbom: true
-          tags: |
-            ghcr.io/reachjalil/litemcp-${{ matrix.component }}:edge
-            ghcr.io/reachjalil/litemcp-${{ matrix.component }}:sha-${{ github.event.workflow_run.head_sha }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/reachjalil/liteMCP
-            org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
-            org.opencontainers.image.licenses=Apache-2.0
-            org.opencontainers.image.description=LiteMCP Composer ${{ matrix.component }} image
-          cache-from: type=gha,scope=${{ matrix.component }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+      - name: Verify candidates and create immutable aliases
+        env:
+          CANDIDATE_SHA: ${{ github.event.workflow_run.head_sha }}
+          CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          CI_RUN_ID: ${{ github.event.workflow_run.id }}
+          SERVER_DIGEST: ${{ steps.evidence.outputs.server_digest }}
+          WEB_DIGEST: ${{ steps.evidence.outputs.web_digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          raw_digest() {
+            printf 'sha256:%s\n' "$(
+              docker buildx imagetools inspect --raw "$1" | sha256sum | awk '{print $1}'
+            )"
+          }
+          for component in server web; do
+            case "$component" in
+              server) expected="$SERVER_DIGEST" ;;
+              web) expected="$WEB_DIGEST" ;;
+            esac
+            repository="ghcr.io/reachjalil/litemcp-$component"
+            candidate="$repository:candidate-$CANDIDATE_SHA-run-$CI_RUN_ID-attempt-$CI_RUN_ATTEMPT"
+            test "$(raw_digest "$candidate")" = "$expected"
+            source="$repository@$expected"
+            test "$(raw_digest "$source")" = "$expected"
+            immutable="$repository:sha-$CANDIDATE_SHA"
+            immutable_inspect_error="$RUNNER_TEMP/immutable-inspect-$component.log"
+            if docker buildx imagetools inspect "$immutable" \
+              >"$RUNNER_TEMP/immutable-inspect-$component.out" \
+              2>"$immutable_inspect_error"; then
+              test "$(raw_digest "$immutable")" = "$expected" || {
+                printf 'Immutable alias %s already points at another digest.\n' \
+                  "$immutable" >&2
+                exit 1
+              }
+            elif grep -Eiq '(manifest unknown|: not found)$' \
+              "$immutable_inspect_error"; then
+              docker buildx imagetools create --prefer-index=false \
+                --tag "$immutable" \
+                "$source"
+            else
+              cat "$immutable_inspect_error" >&2
+              printf 'Refusing immutable alias write because registry inspection did not prove absence.\n' >&2
+              exit 1
+            fi
+            test "$(raw_digest "$immutable")" = "$expected"
+          done
+      - name: Recheck freshness immediately before moving edge
+        env:
+          CANDIDATE_SHA: ${{ github.event.workflow_run.head_sha }}
+          CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          CI_RUN_ID: ${{ github.event.workflow_run.id }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api -X GET \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+            -f branch=main \
+            -f event=push \
+            -f status=success \
+            -f per_page=1 \
+            >"$RUNNER_TEMP/latest-successful-ci-before-edge.json"
+          node scripts/verify-workflow-evidence.mjs latest \
+            "$RUNNER_TEMP/latest-successful-ci-before-edge.json" \
+            "$CANDIDATE_SHA" \
+            "$CI_RUN_ID" \
+            "$CI_RUN_ATTEMPT"
+      - name: Move edge aliases to the qualified digests
+        env:
+          SERVER_DIGEST: ${{ steps.evidence.outputs.server_digest }}
+          WEB_DIGEST: ${{ steps.evidence.outputs.web_digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          raw_digest() {
+            printf 'sha256:%s\n' "$(
+              docker buildx imagetools inspect --raw "$1" | sha256sum | awk '{print $1}'
+            )"
+          }
+          for component in server web; do
+            case "$component" in
+              server) expected="$SERVER_DIGEST" ;;
+              web) expected="$WEB_DIGEST" ;;
+            esac
+            repository="ghcr.io/reachjalil/litemcp-$component"
+            docker buildx imagetools create --prefer-index=false \
+              --tag "$repository:edge" \
+              "$repository@$expected"
+            test "$(raw_digest "$repository:edge")" = "$expected"
+          done
+      - name: Record publication boundary
+        run: >-
+          printf '%s\n'
+          'Both immutable aliases were verified before edge moved. GHCR cannot atomically update the server and web repositories; a partial edge update fails this rerunnable workflow and remains an explicit operational boundary.'

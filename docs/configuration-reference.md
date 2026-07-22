@@ -124,15 +124,18 @@ pnpm --filter @litemcp/managed-cloud db:migrate:local
 pnpm managed-cloud:dev
 ```
 
-Fresh-account provisioning uses an inactive Worker version so draft KV and D1
-bindings and the Durable Object migration exist before the remote D1 migration
-runs. Production commands select the top-level target explicitly:
+Fresh-account provisioning cannot use `wrangler versions upload`: Cloudflare
+requires `wrangler deploy` for a first Worker and for every pending Durable
+Object lifecycle change. Create KV/D1 explicitly, review their checked-in IDs,
+and apply the exact verified CI payload with secure first-deploy secrets and
+maintenance controls from the
+[Durable Object lifecycle runbook](./operations/cloudflare-durable-object-lifecycle.md).
+The remote lifecycle check must pass before ordinary production commands:
 
 ```bash
 pnpm --filter @litemcp/managed-cloud exec wrangler login
 pnpm --filter @litemcp/managed-cloud exec wrangler whoami
-pnpm --filter @litemcp/web build
-pnpm --filter @litemcp/managed-cloud exec wrangler versions upload --env=
+pnpm managed-cloud:do-lifecycle -- --env production
 pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put BETTER_AUTH_SECRET --env=
 pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put CREDENTIAL_MASTER_KEY --env=
 pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put SENTRY_DSN --env=
@@ -140,10 +143,12 @@ pnpm --filter @litemcp/managed-cloud db:migrate:remote
 ```
 
 Configure the account-owned route/custom domain and make `PUBLIC_ORIGIN` and
-`WEB_ORIGINS` match it before directing traffic to the Worker. Then deploy:
+`WEB_ORIGINS` match it before directing traffic to the Worker. Apply trigger
+changes as a separate reviewed mutation, then use the exact-CI-artifact staging
+and production workflows:
 
 ```bash
-pnpm managed-cloud:deploy
+pnpm --filter @litemcp/managed-cloud exec wrangler triggers deploy --env=
 ```
 
 A successful command is not full deployment acceptance. The public preview at
@@ -153,23 +158,41 @@ domain smoke evidence. It does not yet have passing first-admin, privileged
 control-plane, session issue, MCP initialize/list/call, audit correlation,
 SSO/SCIM, rollback, load, or security acceptance.
 
-After the one-time inactive-version bootstrap, the checked-in GitHub deployment
-workflow can run manually or after a green `main` CI build. It requires the
-`managed-cloud` environment secrets `CLOUDFLARE_API_TOKEN` and
-`CLOUDFLARE_ACCOUNT_ID`, plus variables `MANAGED_CLOUD_URL`,
-`MANAGED_CLOUD_RESOURCES_READY=true`, and
-`MANAGED_CLOUD_AUTO_DEPLOY=true` for automatic runs. The exact URL must match
-`PUBLIC_ORIGIN` and appear in `WEB_ORIGINS`.
+After the one-time lifecycle/resource bootstrap, the checked-in staging workflow
+can run manually or after a green `main` CI build; production remains an
+explicit promotion dispatch. The deployment requires distinct `managed-cloud`
+environment secrets `CLOUDFLARE_MIGRATION_API_TOKEN` (D1 read/write only) and
+`CLOUDFLARE_DEPLOY_API_TOKEN` (Worker version/static-asset upload and deployment
+only), plus `CLOUDFLARE_ACCOUNT_ID` and variables `MANAGED_CLOUD_URL`,
+`MANAGED_CLOUD_RESOURCES_READY=true`, the authenticated MCP smoke tuple, and
+repository-level opt-in `CUSTOMER_OWNED_REFERENCE_DEPLOY=true`. Production is
+manual only; its preflight fails a disabled or non-main dispatch. The exact URL
+must match `PUBLIC_ORIGIN` and appear in `WEB_ORIGINS`.
 
 The named Wrangler `staging` environment repeats every non-inherited variable
 and binding with a distinct Worker, route, KV namespace, D1 database, and
 Durable Object namespace. Its automated workflow stays disabled until
-account-owned staging resource IDs are checked in and the protected
+account-owned staging resource IDs are checked in and the
 `managed-cloud-staging` environment supplies its credentials, exact URL, and
-resource-ready marker. Run both compile-time checks without credentials:
+resource-ready marker. Repository variable
+`MANAGED_CLOUD_STAGING_AUTO_DEPLOY=true` enables the exact-CI-artifact automatic
+path; manual dispatch remains available and fails when
+the shared opt-in is absent. The YAML names the environments but cannot
+configure GitHub reviewers or deployment-branch rules; repository admins must
+add those controls before enabling deployment, and the current upstream
+repository does not have them. Run both compile-time checks without credentials:
+
+The production and staging resource-ready markers also attest that an
+account-owned route/custom domain has already been applied with the explicit
+Wrangler target, DNS/TLS resolves the exact configured origin, and the active
+Worker has the final checked-in Durable Object migration tag and bindings.
+Wrangler `versions upload`/`versions deploy` does not apply triggers; trigger
+changes are separate reviewed mutations. Each workflow performs a credentialed
+read-only lifecycle check before upload and relies on public smoke to fail closed on trigger drift.
 
 ```bash
 node scripts/check-managed-cloud-wrangler.mjs
+pnpm managed-cloud:do-lifecycle -- --self-test
 pnpm --filter @litemcp/managed-cloud wrangler:dry-run
 pnpm --filter @litemcp/managed-cloud wrangler:dry-run:staging
 ```

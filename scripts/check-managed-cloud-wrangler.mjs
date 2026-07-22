@@ -8,6 +8,9 @@ const config = JSON.parse(readFileSync(configPath, "utf8"));
 const requireStagingResourceIds = process.argv.includes(
   "--require-staging-resource-ids"
 );
+const kvNamespaceIdPattern = /^[0-9a-f]{32}$/;
+const d1DatabaseIdPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 const fail = (message) => {
   throw new Error(`Managed-cloud Wrangler configuration: ${message}`);
@@ -157,8 +160,12 @@ requireValue(
   "TenantFeedDurableObject must have its own SQLite migration."
 );
 requireValue(
-  production.kv.id && production.d1.database_id,
-  "production KV and D1 resource IDs must be checked in."
+  kvNamespaceIdPattern.test(production.kv.id ?? ""),
+  "production DATA_KV id must be a lowercase 32-character hexadecimal namespace ID."
+);
+requireValue(
+  d1DatabaseIdPattern.test(production.d1.database_id ?? ""),
+  "production AUTH_DB database_id must be a canonical UUID."
 );
 
 const productionRoutes = new Set(production.routes.map((route) => route.pattern));
@@ -180,12 +187,12 @@ if (production.d1.database_id && staging.d1.database_id) {
 }
 if (requireStagingResourceIds) {
   requireValue(
-    staging.kv.id,
-    "staging DATA_KV id must be checked in before automated deployment is enabled."
+    kvNamespaceIdPattern.test(staging.kv.id ?? ""),
+    "staging DATA_KV id must be a reviewed lowercase 32-character hexadecimal namespace ID before deployment is enabled."
   );
   requireValue(
-    staging.d1.database_id,
-    "staging AUTH_DB database_id must be checked in before automated deployment is enabled."
+    d1DatabaseIdPattern.test(staging.d1.database_id ?? ""),
+    "staging AUTH_DB database_id must be a reviewed canonical UUID before deployment is enabled."
   );
 }
 

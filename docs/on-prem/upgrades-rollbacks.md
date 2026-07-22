@@ -25,6 +25,28 @@ not assume that rolling back an application image reverses a database change.
 If release notes do not state that the previous server can read the upgraded
 schema, treat application rollback as unsafe until tested.
 
+For the Better Auth 1.7 transition, use the guarded planner before changing the
+application image:
+
+```bash
+MONGODB_URI="$MONGODB_URI" MONGODB_DATABASE=litemcp \
+  pnpm --filter @litemcp/server auth:migrate:1.7:check
+```
+
+The planner fails closed when a legacy SCIM provider uses a built-in Better
+Auth account provider ID because 1.6 account rows in that shared namespace
+cannot be classified or bulk-rekeyed safely.
+
+After a tested backup, freeze SCIM writes and run `auth:migrate:1.7:apply` with
+both `BETTER_AUTH_MIGRATION_BACKUP_CONFIRMED=true` and
+`BETTER_AUTH_MIGRATION_SCIM_WRITES_FROZEN=true` in a maintenance window. It
+transactionally adds organization/provider keys and rekeys existing
+SCIM-managed accounts, then installs and verifies the 1.7 indexes with majority
+write concern. Run `auth:migrate:1.7:check` again before releasing the window.
+The 1.6 application is not compatible with those new account keys, so
+immediately deploy all 1.7 replicas; restoring the prior image alone is not a
+safe rollback.
+
 ## Helm upgrade
 
 Render and review the exact release first:
@@ -46,6 +68,12 @@ helm upgrade litemcp deploy/helm/litemcp \
   --wait \
   --timeout 10m
 ```
+
+That generic `--atomic` example is only safe when the previous application can
+read the new database state. Do not use automatic Helm rollback to a Better Auth
+1.6 revision after the 1.7 account rekey. Keep the maintenance boundary in
+place and follow the reviewed roll-forward or database-restore plan if the 1.7
+rollout fails.
 
 Observe rollout status, restarts, readiness, error rate, authentication
 failures, policy denials, MongoDB latency, and invocation outcomes. Test server

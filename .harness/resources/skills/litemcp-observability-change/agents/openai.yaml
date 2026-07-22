@@ -1,0 +1,4 @@
+interface:
+  display_name: "LiteMCP Observability Change"
+  short_description: "Evolve payload-free usage analytics"
+  default_prompt: "Use $litemcp-observability-change to implement or review this insight-plane change."

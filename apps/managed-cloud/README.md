@@ -62,14 +62,24 @@ state.
 
 ## Customer-owned production deployment
 
-On a fresh account, upload an inactive version first so Wrangler can provision
-the draft KV and D1 bindings without sending traffic to an unmigrated database:
+On a fresh account, create the account-owned KV namespace and D1 database
+explicitly and record their reviewed IDs before deployment. A first Worker
+deployment and a pending Durable Object lifecycle migration cannot use
+`wrangler versions upload`; apply them with a separately authorized
+`wrangler deploy` of the exact verified CI archive, secure `--secrets-file`, and
+full maintenance/write-freeze controls. Follow the
+[Durable Object lifecycle runbook](../../docs/operations/cloudflare-durable-object-lifecycle.md)
+and do not set a resource-ready marker until its remote check passes.
+
+After the Worker exists at the final checked-in lifecycle tag, configure or
+rotate runtime secrets and complete the D1 transition for the explicit target:
 
 ```bash
-pnpm --filter @litemcp/managed-cloud exec wrangler login
+test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
+test -n "${CLOUDFLARE_API_TOKEN:-}"
+pnpm managed-cloud:do-lifecycle -- --identity production
 pnpm --filter @litemcp/managed-cloud exec wrangler whoami
-pnpm --filter @litemcp/managed-cloud build:web
-pnpm --filter @litemcp/managed-cloud exec wrangler versions upload --env=
+pnpm managed-cloud:do-lifecycle -- --env production
 pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put BETTER_AUTH_SECRET --env=
 pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put CREDENTIAL_MASTER_KEY --env=
 pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put SENTRY_DSN --env=
@@ -79,21 +89,48 @@ pnpm --filter @litemcp/managed-cloud db:migrate:remote
 Next, bind an account-owned route or custom domain and make `PUBLIC_ORIGIN` and
 `WEB_ORIGINS` in `wrangler.jsonc` match that exact HTTPS origin. The checked-in
 origin must not be paired with an unrelated `workers.dev` deployment. Only
-then deploy traffic:
+then apply the reviewed trigger configuration and deploy traffic:
 
 ```bash
-pnpm managed-cloud:deploy
+pnpm --filter @litemcp/managed-cloud exec wrangler triggers deploy --env=
+# Then use the exact-CI-artifact staging and production workflows.
 ```
+
+Wrangler `versions upload`/`versions deploy` does not create or update routes,
+custom domains, or cron triggers. Treat trigger deployment as a separate
+reviewed mutation and verify the account route, DNS/TLS, and exact public origin before setting
+`MANAGED_CLOUD_RESOURCES_READY=true`. That marker also attests that the active
+Worker has the final checked-in Durable Object migration tag and bindings. The
+workflow verifies the lifecycle state through a read-only Cloudflare settings
+lookup before every version upload.
 
 The checked-in workflow is a customer-owned reference, not the deployment path
 for LiteMCP's operated service. To use it in a fork, configure the GitHub
-`managed-cloud` environment with `CLOUDFLARE_API_TOKEN` and
-`CLOUDFLARE_ACCOUNT_ID` secrets plus `MANAGED_CLOUD_URL`,
-`MANAGED_CLOUD_RESOURCES_READY=true`, and optionally
-`MANAGED_CLOUD_AUTO_DEPLOY=true` variables. Set
+`managed-cloud` environment with distinct `CLOUDFLARE_MIGRATION_API_TOKEN` and
+`CLOUDFLARE_DEPLOY_API_TOKEN` secrets plus `CLOUDFLARE_ACCOUNT_ID` and
+`MANAGED_CLOUD_URL`,
+`MANAGED_CLOUD_RESOURCES_READY=true`, and the authenticated MCP smoke variables.
+Production is dispatch-only. Set repository variable
 `CUSTOMER_OWNED_REFERENCE_DEPLOY=true` only after reviewing the composition for
-your account. The workflow refuses to run when that opt-in, the resource-ready
-marker, or the exact origin match is absent.
+your account. Its always-running preflight fails the dispatch when that opt-in
+or the main-branch control ref is absent; later gates fail on a missing
+resource-ready marker, exact origin, CI/staging evidence, or smoke tuple.
+Configure required reviewers and protected deployment branches on the
+`managed-cloud` GitHub environment before enabling it; declaring the environment
+in YAML does not create those remote protections. Scope the migration token to
+D1 read/write only and the deploy token to Worker version/static-asset upload
+and traffic deployment plus Worker-settings read only; the workflow rejects
+equal token values. Do not widen either token for Durable Object lifecycle
+authority. That separately reviewed operation uses a short-lived operator
+credential and the exact CI archive. Static assets and the Worker bundle are
+built without credentials in the exact CI run, retained with a SHA-256
+manifest, and uploaded later with `--no-bundle`.
+
+While Better Auth migration `0003_better_auth_1_7_scim.sql` is pending, the
+environment must also attest a real SCIM/auth write freeze with
+`SCIM_WRITES_FROZEN=true` and bind approval to the exact candidate using
+`BETTER_AUTH_1_7_MIGRATION_APPROVED_SHA=<full SHA>`. The preflight ignores those
+temporary attestations after the migration is recorded as applied.
 
 ## Isolated staging target
 
@@ -106,26 +143,62 @@ commands pass an explicit empty environment (`--env=`); staging commands pass
 wrong target.
 
 The checked-in staging KV and D1 bindings deliberately begin without resource
-IDs. Bootstrap them with an inactive upload, record the account-owned IDs in
-`env.staging`, and review the resulting diff before enabling automation:
+IDs. Create those resources explicitly, record the account-owned IDs in
+`env.staging`, and review the resulting diff. The lifecycle config writer and
+identity check refuse missing, malformed, cross-target, or account-inaccessible
+IDs. For a brand-new empty D1 database, apply all checked-in D1 migrations and
+verify the upgraded fingerprint before the first Worker deploy; an existing
+legacy target instead uses maintenance/write freeze and the read-only preflight.
+Then apply the first Worker and both checked-in Durable Object migrations from
+the verified staging CI payload using the lifecycle runbook; a first
+`versions upload` is not supported:
 
 ```bash
-pnpm --filter @litemcp/managed-cloud build:web:staging
-pnpm --filter @litemcp/managed-cloud exec wrangler versions upload --env staging
+node scripts/check-managed-cloud-wrangler.mjs --require-staging-resource-ids
+pnpm managed-cloud:do-lifecycle -- --identity staging
+# Complete exactly one of the new-target/existing-target D1 sequences, then
+# apply and verify the exact CI staging Worker payload as documented in:
+# docs/operations/cloudflare-durable-object-lifecycle.md
+pnpm managed-cloud:do-lifecycle -- --env staging
 pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put BETTER_AUTH_SECRET --env staging
 pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put CREDENTIAL_MASTER_KEY --env staging
 pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put SENTRY_DSN --env staging
-pnpm --filter @litemcp/managed-cloud db:migrate:staging
-node scripts/check-managed-cloud-wrangler.mjs --require-staging-resource-ids
+pnpm --filter @litemcp/managed-cloud exec wrangler triggers deploy --env staging
 ```
 
+Run the trigger command only after replacing the staging resource IDs and
+reviewing the exact account-owned route/custom domain and origins. Confirm the
+remote lifecycle tag/bindings, DNS/TLS, and public reachability before setting
+`MANAGED_CLOUD_STAGING_RESOURCES_READY=true`; automated version promotion
+intentionally does not mutate triggers.
+
 The customer-owned `managed-cloud-staging` GitHub environment then needs
-`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets plus
+distinct `CLOUDFLARE_MIGRATION_API_TOKEN`, `CLOUDFLARE_DEPLOY_API_TOKEN`, and
+`CLOUDFLARE_ACCOUNT_ID` secrets plus
 `MANAGED_CLOUD_STAGING_URL`, `MANAGED_CLOUD_STAGING_RESOURCES_READY=true`, and
-optionally `MANAGED_CLOUD_STAGING_AUTO_DEPLOY=true` variables, plus the same
-`CUSTOMER_OWNED_REFERENCE_DEPLOY=true` opt-in. A green `main` CI run can deploy
-staging only after all of those gates and the checked-in resource-ID/origin
-checks pass. Production remains a separate protected environment and workflow.
+the authenticated MCP endpoint/token/tool tuple. Repository variable
+`MANAGED_CLOUD_STAGING_AUTO_DEPLOY=true` enables automation; repository variable
+`CUSTOMER_OWNED_REFERENCE_DEPLOY=true` is the shared opt-in. A green `main` CI
+run can deploy staging only after all gates and the checked-in
+resource-ID/origin checks pass. Manual staging dispatches fail explicitly when
+the shared opt-in is absent; automatic runs remain intentionally skipped until
+the staging auto flag is enabled. Configure reviewers and deployment-branch
+policies independently on `managed-cloud-staging` and `managed-cloud`; they are
+not present in the current upstream repository.
+
+Each deployment uploads the verified CI archive as a uniquely tagged Worker
+version, deploys by the parsed UUID, verifies that the latest deployment sends
+100% of traffic to that UUID, and records the target, archive hash, migration
+set, CI/deployment attempts, URL, and smoke results. Production and staging have
+separate archives because their public origins and bindings differ; both are
+built once by the same exact CI run.
+
+The resource-ready markers also attest that the separately managed route/custom
+domain triggers still match the checked-in target and that the active Worker is
+at the final checked-in Durable Object migration tag. If either lifecycle or
+trigger configuration changes, stop automation, apply and verify it as its own
+reviewed mutation, then re-enable the marker. The promotion workflows perform a
+credentialed read-only lifecycle check before any version upload.
 
 ## Signup and email gate
 
@@ -190,3 +263,5 @@ the current managed service still has the limits described in
 - `src/index.ts` — Cloudflare composition root.
 - `migrations/` — Better Auth D1 schema.
 - `scripts/print-auth-migration.ts` — reproducible auth migration generator.
+- `../../docs/operations/cloudflare-durable-object-lifecycle.md` — first-deploy
+  and lifecycle-change boundary for exact CI payloads.
