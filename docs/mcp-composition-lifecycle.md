@@ -18,7 +18,7 @@ for a production release.
 | Policy | Default effect plus ordered rules over subject, action, tool, and risk | Organization/environment |
 | Subject | Human or workload identity with roles, groups, and claims | Authenticated organization membership |
 | Gateway session | Short-lived binding from subject to environment, composition, client, expiry, and revocation state | Organization |
-| Approval | Pending/decided request bound to the exact normalized arguments | Organization and session |
+| Approval | Pending/decided request bound to session, composition, server, policy, epoch, tool, and normalized arguments | Organization and session |
 | Audit event | Correlated, redacted evidence for governance and execution transitions | Organization |
 
 Schemas live in [`packages/contracts`](../packages/contracts/README.md). Portable
@@ -84,9 +84,11 @@ token hash rather than plaintext.
 The session binds:
 
 - organization and environment;
-- composition ID and currently resolved version context;
+- composition identity; the current published version is resolved and checked
+  again for each call;
 - authenticated human or workload subject;
 - approved client identifiers;
+- authorization epoch and optional OAuth grant-family identity;
 - issue and expiry timestamps;
 - revocation state.
 
@@ -104,8 +106,12 @@ committed to source control.
 
 The client sends JSON-RPC `initialize` with the supported MCP protocol revision.
 The current gateway pins `2025-11-25` and returns a protocol error when it cannot
-negotiate the request. A production release still needs official conformance and
-multi-client compatibility evidence.
+negotiate the request. The first valid initialize also records bounded
+`clientInfo` as separate first-write-wins session attribution for later usage
+facts. Client name/version is self-reported and is not an authentication or
+named-client compatibility result. Updating attribution does not mutate the
+authorization-session revision. A production release still needs official
+conformance and multi-client compatibility evidence.
 
 ## Discover capabilities
 
@@ -123,6 +129,10 @@ For `tools/list`, the gateway performs the following sequence:
 Directly guessing a hidden name does not bypass policy because execution repeats
 authorization.
 
+The fail-open Insight Plane records one aggregate discovery fact with canonical
+visible/hidden counts and a capped visible-tool sample. It does not fan out one
+analytics record per tool. Audit remains a separate fail-closed path.
+
 ## Execute a tool
 
 For `tools/call`, the gateway:
@@ -131,16 +141,32 @@ For `tools/call`, the gateway:
 2. resolves the public name to one pinned upstream capability;
 3. evaluates `execute` policy independently of prior discovery;
 4. validates arguments with a fresh JSON Schema 2020-12 validator;
-5. creates a pending approval and stops when policy requires approval;
+5. creates or consumes an exact-context, one-shot approval and stops when a
+   decision is still required;
 6. records a pre-dispatch audit transition;
-7. selects the bounded executor and dispatches once;
+7. reauthenticates and revalidates the current session/authority/composition/
+   server/policy context, then selects the bounded executor and dispatches once;
 8. preserves content, structured content, error state, and provenance;
 9. records the outcome without turning a completed side effect into a retryable
    failure.
 
-The current approval slice does not yet include an independent approver decision
-or exact one-time resume. The current route is deterministic; regional health,
-weights, quotas, and circuit-breaker state are designed but not complete.
+The current approval slice supports an independent decision, expiry, and an
+exact one-time client retry; it does not store arguments or resume calls on the
+server. The current route is deterministic, enforces fixed organization quotas,
+and bounds tenant/server executor concurrency with circuit state. Regional
+candidate health, weights, residency, credential-aware routing, and ledgered
+failover are not complete. The final context check is not a transaction with
+the external side effect, so a strict freeze/revoke-versus-dispatch barrier
+remains a release gap.
+
+Each valid call attempt produces exactly one terminal usage fact across
+success, denial, pending/denied approval, quota, validation, upstream, and
+tool-reported failure paths. It contains dimensions and measures only, never
+arguments or results. Remote HTTP timing surrounds each `fetch`, so upstream
+latency/bytes accumulate across safe retries while total latency covers the
+complete gateway path. `requestId` and an optional audit receipt correlate the
+two evidence planes. See
+[`usage-observability.md`](./usage-observability.md).
 
 ## Executor boundaries
 
@@ -200,10 +226,13 @@ for the complete target model.
 gateway, auth composition, and control-plane API. Only adapters and runtime
 assembly differ:
 
-- managed cloud currently uses Cloudflare Workers, KV, and D1;
+- the managed-cloud working tree uses Cloudflare Workers, KV, one tenant Durable
+  Object for the security-sensitive slice, and D1 for Better Auth;
 - portable server uses Node.js and MongoDB for Docker/Kubernetes;
 - Cloudflare code remains inside `apps/managed-cloud` and
   `packages/adapter-cloudflare`.
 
-Portable export is implemented for non-secret configuration. Import and a live
-managed cloud to Kubernetes exit test remain incomplete.
+Portable export and fully validated pristine-target import are implemented for
+non-secret configuration. Import is multi-document rather than atomic, and a
+live managed-cloud-to-Kubernetes exit test with credential reconfiguration
+remains incomplete.

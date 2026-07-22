@@ -4,15 +4,15 @@ import SectionHeader from "../components/SectionHeader.astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
 ---
 
-<SiteLayout title="Managed cloud" description="Inspect the LiteMCP Composer managed cloud deployment preview, currently implemented with Cloudflare infrastructure and not yet released as a public operated service.">
+<SiteLayout title="Managed cloud" description="Inspect the live LiteMCP Composer managed-cloud preview, its current Cloudflare-backed deployment evidence, and the acceptance work that remains before general availability.">
   <PageHero
     eyebrow="Managed cloud · Preview"
-    title="The managed cloud target is open and buildable."
-    description="The Cloudflare-backed Worker bundle, storage adapters, authentication migration, and static site build locally. No authenticated public deployment or operated-service availability is claimed yet."
-    signal="Source preview, not a live service"
+    title="The managed-cloud preview is live."
+    description="The public site and Worker run at litemcpcomposer.com. Health, readiness, authentication routing, storage bindings, TLS, and canonical-domain behavior have deployment evidence; privileged onboarding and MCP workflows remain preview acceptance work."
+    signal="Public preview · signups closed by default"
   >
     <Fragment slot="actions">
-      <a class="button button--primary button--large" href="/app">Open the local console</a>
+      <a class="button button--primary button--large" href="/app">Open the preview console</a>
       <a class="button button--large" href="/pricing">Compare distributions</a>
     </Fragment>
   </PageHero>
@@ -20,9 +20,9 @@ import SiteLayout from "../layouts/SiteLayout.astro";
   <section class="content-section">
     <div class="shell">
       <SectionHeader
-        eyebrow="Intended managed cloud contract"
+        eyebrow="Managed cloud contract"
         title="Convenience without a closed product fork."
-        description="When the service becomes available, it is intended to operate the same open capability maturity as self-hosting and publish limits that protect shared infrastructure."
+        description="The preview runs the complete public product core. A separate private control plane handles customer lifecycle, hosted entitlements, billing, support access, provisioning, and fleet releases."
       />
       <div class="two-column-cards">
         <article>
@@ -36,9 +36,9 @@ import SiteLayout from "../layouts/SiteLayout.astro";
           <p>Configuration export and shared packages exist. A live import and execution test from managed cloud to Kubernetes has not yet passed.</p>
         </article>
         <article>
-          <p class="eyebrow">Planned</p>
-          <h2>Limits will be published</h2>
-          <p>Request, concurrency, storage, and abuse controls will be documented before general availability. No limits are claimed here before they are set.</p>
+          <p class="eyebrow">Published preview defaults</p>
+          <h2>Fair-use limits are explicit</h2>
+          <p>Each hosted-preview organization receives 5 servers, 5 compositions, 25 active sessions, and 1,000 tool calls per UTC day. Self-hosted deployments do not inherit these commercial limits.</p>
         </article>
         <article>
           <p class="eyebrow">Product commitment</p>
@@ -53,16 +53,19 @@ import SiteLayout from "../layouts/SiteLayout.astro";
     <div class="shell split-layout">
       <div class="split-layout__aside">
         <p class="eyebrow">Current status</p>
-        <h2>Build validation exists; release proof does not.</h2>
+        <h2>Deployment proof exists; product acceptance is incomplete.</h2>
         <p>
-          Wrangler dry-run bundling and the local D1 migration pass. Wrangler was not authenticated,
-          no service was deployed, and no live authentication, API, MCP, or rollback smoke test ran.
+          The Worker, static assets, TLS routes, dedicated KV/D1 resources, remote auth migration,
+          health/readiness, unauthenticated session endpoint, and apex/www routing passed on 21 July
+          2026. First-admin onboarding, privileged control-plane use, MCP initialize/list/call,
+          rollback, load, and external security acceptance have not passed.
         </p>
       </div>
       <div class="legal-note">
-        The current KV product-state adapter is eventually consistent and evaluation-grade for
-        security-sensitive state. Availability, regional placement, fair-use thresholds, durability,
-        and support targets remain unpublished.
+        Catalog projections still use eventually consistent KV storage, while the current
+        composition routes security-sensitive authority through a Durable Object boundary.
+        Multi-writer parity, recovery, availability, regional placement, durability, and support
+        targets remain unproven. <a href="https://github.com/reachjalil/liteMCP/blob/main/docs/managed-cloud-fair-use.md">Read the fair-use boundary ↗</a>
       </div>
     </div>
   </section>

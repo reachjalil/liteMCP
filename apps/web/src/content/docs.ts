@@ -410,6 +410,47 @@ export const documentationReferences: DocumentationReference[] = [
       { label: "Open-source project", href: "/open-source" },
     ],
   },
+  {
+    slug: "usage-observability",
+    index: "R11",
+    title: "Usage observability and analytics",
+    shortTitle: "Usage analytics",
+    description:
+      "Understand payload-free usage facts, exact quota standing, tenant analytics APIs, storage boundaries, and the six Insight Plane console views.",
+    boundary:
+      "Analytics is fail open and can be incomplete. Managed queries currently use a capped exact event feed; audit remains the fail-closed evidence path, and alerts, SIEM delivery, WebSockets, and deployed acceptance remain outstanding.",
+    repositoryPath: "docs/usage-observability.md",
+    useWhen: [
+      "Interpreting usage, latency, client, identity, policy, approval, session, and tool-flow views.",
+      "Integrating the tenant-scoped analytics JSON or CSV routes without confusing analytics with quota or audit authority.",
+      "Choosing MongoDB or managed-cloud analytics settings and reviewing their retention, capacity, and failure boundaries.",
+    ],
+    sections: [
+      {
+        title: "Events and attribution",
+        description:
+          "Strict payload-free facts, first-write self-reported client attribution, request and audit correlation, and terminal call semantics.",
+      },
+      {
+        title: "Storage and APIs",
+        description:
+          "Memory, MongoDB time-series, Analytics Engine emission, capped tenant feed queries, exact quota standing, and tenant-derived HTTP access.",
+      },
+      {
+        title: "Console and evidence boundary",
+        description:
+          "Dashboard, Live, Tools, Identities, Sessions, and Policy insights plus the explicit proof and delivery work still outstanding.",
+      },
+    ],
+    related: [
+      { label: "Management console", href: "/docs/reference/console-guide" },
+      { label: "API and SDK reference", href: "/docs/reference/api-and-sdk-reference" },
+      {
+        label: "Configuration reference",
+        href: "/docs/reference/configuration-reference",
+      },
+    ],
+  },
 ];
 
 export const documentationSourceUrl = (repositoryPath: string) =>

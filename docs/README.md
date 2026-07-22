@@ -21,6 +21,12 @@ with the two status files before relying on any capability in production.
   composition, session, discovery, execution, approval, and failure behavior.
 - [`api-and-sdk-reference.md`](./api-and-sdk-reference.md) — control-plane API,
   MCP endpoint, TypeScript/Python SDKs, CLI, and concrete requests.
+- [`mcp-client-compatibility.md`](./mcp-client-compatibility.md) — named-client
+  evidence matrix, implemented MCP surface, blockers, and verification record.
+- [`managed-cloud-fair-use.md`](./managed-cloud-fair-use.md) — published free
+  defaults, counting semantics, enforcement behavior, and non-SLA boundary.
+- [`usage-observability.md`](./usage-observability.md) — Insight Plane event,
+  attribution, storage, API, console, privacy, retention, and evidence boundary.
 - [`console-guide.md`](./console-guide.md) — authenticated/demo modes, each
   console area, current workflows, errors, and planned enterprise surfaces.
 - [`configuration-reference.md`](./configuration-reference.md) — Node,

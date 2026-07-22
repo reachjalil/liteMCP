@@ -89,7 +89,7 @@ case "$BACKUP_MODE" in
       --env-file "$COMPOSE_ENV_FILE" \
       -f "$COMPOSE_FILE" \
       exec -T mongodb \
-      mongodump --quiet --db litemcp --archive --gzip >"$temporary_path"
+      sh -ec 'exec mongodump --quiet --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --db litemcp --archive --gzip' >"$temporary_path"
     ;;
   external)
     command -v mongodump >/dev/null 2>&1 || {

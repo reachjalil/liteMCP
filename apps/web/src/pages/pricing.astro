@@ -3,11 +3,11 @@ import PageHero from "../components/PageHero.astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
 ---
 
-<SiteLayout title="Pricing" description="LiteMCP Composer is Apache-2.0 software. Managed cloud availability and enterprise service terms are planned, not currently offered as production commitments.">
+<SiteLayout title="Pricing" description="LiteMCP Composer is complete Apache-2.0 software. The managed-cloud preview is currently free under published quotas; future hosted plans will price operated capacity and support.">
   <PageHero
     eyebrow="Pricing"
-    title="The software is open. Service terms come after release proof."
-    description="Evaluate the Apache-2.0 source today. The intended managed cloud remains free under future published fair-use limits, while enterprise services will be scoped only when delivery and support terms are ready."
+    title="Open product. Optional operated service."
+    description="Evaluate and run the complete Apache-2.0 product today. The managed-cloud preview is currently free under published quotas; future hosted plans will cover operated capacity, reliability, and support once their terms are published."
     signal="Pre-1.0 product and service model"
   />
 
@@ -15,14 +15,15 @@ import SiteLayout from "../layouts/SiteLayout.astro";
     <div class="shell price-grid">
       <article class="price-card">
         <span class="price-card__label">Managed cloud · Preview</span>
-        <h2>Community-cloud target</h2>
-        <div class="price-card__price">Planned</div>
-        <p>The deployment source builds, but no public operated service or availability date is claimed.</p>
+        <h2>Community-cloud preview</h2>
+        <div class="price-card__price">Free</div>
+        <p>The public preview is live with registration controlled and no availability or support commitment.</p>
         <ul class="check-list">
-          <li>Intended free community model</li>
-          <li>Fair-use controls published before launch</li>
+          <li>5 servers and 5 compositions per organization</li>
+          <li>25 active sessions</li>
+          <li>1,000 tool calls per UTC day</li>
           <li>Configuration export in preview</li>
-          <li>No uptime or support commitment yet</li>
+          <li>No uptime, capacity, or support commitment</li>
         </ul>
         <a class="button" href="/cloud">Managed cloud details</a>
       </article>
@@ -30,7 +31,7 @@ import SiteLayout from "../layouts/SiteLayout.astro";
         <span class="price-card__label">Your infrastructure · Preview</span>
         <h2>Self-hosted source</h2>
         <div class="price-card__price">Free</div>
-        <p>The current vertical slice and deployment assets under Apache License 2.0.</p>
+        <p>The complete product core and deployment assets under Apache License 2.0.</p>
         <ul class="check-list">
           <li>Docker images and Compose configuration</li>
           <li>Helm chart lint/render validation</li>
@@ -60,12 +61,12 @@ import SiteLayout from "../layouts/SiteLayout.astro";
     <div class="shell split-layout">
       <div class="split-layout__aside">
         <p class="eyebrow">Plain-language model</p>
-        <h2>No capability matrix designed to force an upgrade.</h2>
+        <h2>Hosted plans pay for an operated service, not permission to self-host.</h2>
       </div>
       <ul class="principle-list">
-        <li><span>01</span><div><strong>Managed cloud is an intended free service</strong><p>No live service exists yet; fair-use limits will be published before general availability.</p></div></li>
-        <li><span>02</span><div><strong>Self-hosting follows one open roadmap</strong><p>Available, preview, and planned identity, policy, audit, and operations capabilities remain public.</p></div></li>
-        <li><span>03</span><div><strong>Services are intended to buy responsibility</strong><p>Future contracts should cover human work, release support, escalation, and response—not a secret binary.</p></div></li>
+        <li><span>01</span><div><strong>Managed cloud is currently a free preview</strong><p>Preview quotas are published and enforced. Future paid plans, capacity commitments, and SLAs will apply only after separate service terms are published.</p></div></li>
+        <li><span>02</span><div><strong>Self-hosting is independently operable</strong><p>The public distribution has no hosted entitlement check, mandatory call-home path, or commercial quota by default; operators may set local governance limits.</p></div></li>
+        <li><span>03</span><div><strong>Services buy operations and responsibility</strong><p>Future contracts can cover managed capacity, human work, release support, escalation, and response—not access to a secret product binary.</p></div></li>
       </ul>
     </div>
   </section>

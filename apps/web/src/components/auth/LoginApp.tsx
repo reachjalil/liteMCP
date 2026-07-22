@@ -1,12 +1,13 @@
 import { createAuthClient } from "better-auth/react";
 import type { SubmitEvent } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import "../../styles/auth.css";
 
 type LoginAppProps = {
   apiBaseUrl?: string;
   demoMode?: boolean;
+  signupsEnabled?: boolean;
 };
 
 type AuthNotice = {
@@ -27,15 +28,40 @@ const readableError = (value: unknown, fallback: string) => {
   return fallback;
 };
 
-export function LoginApp({ apiBaseUrl = "", demoMode = false }: LoginAppProps) {
-  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
+const safeReturnPath = (value: string | null, origin: string) => {
+  if (!value) return null;
+  try {
+    const candidate = new URL(value, origin);
+    if (candidate.origin !== origin) return null;
+    if (!/^\/oauth\/[^/]+\/authorize$/.test(candidate.pathname)) return null;
+    return `${candidate.pathname}${candidate.search}`;
+  } catch {
+    return null;
+  }
+};
+
+export function LoginApp({
+  apiBaseUrl = "",
+  demoMode = false,
+  signupsEnabled = false,
+}: LoginAppProps) {
+  const [mode, setMode] = useState<"sign-in" | "sign-up" | "forgot" | "reset">(
+    "sign-in"
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [ssoValue, setSsoValue] = useState("");
   const [ssoLookup, setSsoLookup] = useState<"email" | "provider">("email");
-  const [pending, setPending] = useState<"password" | "sso" | null>(null);
+  const [pending, setPending] = useState<"password" | "sso" | "invitation" | null>(
+    null
+  );
   const [notice, setNotice] = useState<AuthNotice | null>(null);
+  const [invitationId, setInvitationId] = useState<string | null>(null);
+  const [resetToken, setResetToken] = useState<string | null>(null);
+  const [returnTo, setReturnTo] = useState<string | null>(null);
+  const autoAcceptanceStarted = useRef(false);
+  const registrationEnabled = demoMode || signupsEnabled;
 
   const authClient = useMemo(
     () =>
@@ -46,23 +72,174 @@ export function LoginApp({ apiBaseUrl = "", demoMode = false }: LoginAppProps) {
     [apiBaseUrl]
   );
 
-  const callbackURL = () => new URL("/app", window.location.origin).toString();
+  const callbackURL = () => {
+    if (!invitationId) {
+      return new URL(returnTo ?? "/app", window.location.origin).toString();
+    }
+    const callback = new URL("/login", window.location.origin);
+    callback.searchParams.set("invitationId", invitationId);
+    if (returnTo) callback.searchParams.set("returnTo", returnTo);
+    return callback.toString();
+  };
+
+  const verificationCallbackURL = () => {
+    if (invitationId) return callbackURL();
+    const callback = new URL("/login", window.location.origin);
+    callback.searchParams.set("verified", "1");
+    if (returnTo) callback.searchParams.set("returnTo", returnTo);
+    return callback.toString();
+  };
+
+  const postAuthDestination = () => returnTo ?? "/app";
+
+  useEffect(() => {
+    const search = new URLSearchParams(window.location.search);
+    const requestedReturnTo = safeReturnPath(
+      search.get("returnTo"),
+      window.location.origin
+    );
+    setReturnTo(requestedReturnTo);
+    const passwordResetToken = search.get("token");
+    if (passwordResetToken) {
+      setResetToken(passwordResetToken);
+      setMode("reset");
+    } else if (search.get("error") === "INVALID_TOKEN") {
+      setNotice({
+        tone: "error",
+        text: "That password-reset link is invalid or expired. Request a new one.",
+      });
+      setMode("forgot");
+    }
+    const currentInvitationId = search.get("invitationId");
+    if (search.get("verified") === "1") {
+      setNotice({
+        tone: "success",
+        text: "Email verified. Sign in to continue to the control plane.",
+      });
+    }
+    if (!currentInvitationId) return;
+    setInvitationId(currentInvitationId);
+    if (autoAcceptanceStarted.current) return;
+    autoAcceptanceStarted.current = true;
+
+    void (async () => {
+      const session = await authClient.getSession();
+      if (!session.data) {
+        setNotice({
+          tone: "info",
+          text: "Sign in with the invited email address to join the organization.",
+        });
+        return;
+      }
+      setPending("invitation");
+      const result = await authClient.$fetch("/organization/accept-invitation", {
+        method: "POST",
+        body: { invitationId: currentInvitationId },
+      });
+      if (result.error) {
+        setPending(null);
+        setNotice({
+          tone: "error",
+          text: readableError(result.error, "The invitation could not be accepted."),
+        });
+        return;
+      }
+      window.location.replace(requestedReturnTo ?? "/app");
+    })().catch((cause: unknown) => {
+      setPending(null);
+      setNotice({
+        tone: "error",
+        text: readableError(cause, "The invitation could not be accepted."),
+      });
+    });
+  }, [authClient]);
+
+  const ensureActiveOrganization = async () => {
+    const session = await authClient.getSession();
+    const activeOrganizationId = (
+      session.data as { session?: { activeOrganizationId?: unknown } } | null
+    )?.session?.activeOrganizationId;
+    if (typeof activeOrganizationId === "string") return;
+    if (!registrationEnabled) return;
+    const localPart = email.trim().split("@")[0] || "workspace";
+    const baseSlug =
+      localPart
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "workspace";
+    const result = await authClient.$fetch("/organization/create", {
+      method: "POST",
+      body: {
+        name: name.trim() || `${localPart} workspace`,
+        slug: `${baseSlug}-${crypto.randomUUID().slice(0, 8)}`,
+      },
+    });
+    if (result.error) {
+      throw new Error(
+        readableError(result.error, "Your first organization could not be created.")
+      );
+    }
+  };
 
   const submitPassword = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setPending("password");
     setNotice(null);
     try {
+      if (mode === "forgot") {
+        const redirectTo = new URL("/login", window.location.origin).toString();
+        const result = await authClient.$fetch("/request-password-reset", {
+          method: "POST",
+          body: { email: email.trim(), redirectTo },
+        });
+        if (result.error) {
+          setNotice({
+            tone: "error",
+            text: readableError(result.error, "Password reset could not be requested."),
+          });
+          return;
+        }
+        setNotice({
+          tone: "success",
+          text: "If that account exists, a password-reset link is on its way.",
+        });
+        return;
+      }
+      if (mode === "reset") {
+        if (!resetToken) {
+          setNotice({ tone: "error", text: "The password-reset token is missing." });
+          return;
+        }
+        const result = await authClient.$fetch("/reset-password", {
+          method: "POST",
+          body: { newPassword: password, token: resetToken },
+        });
+        if (result.error) {
+          setNotice({
+            tone: "error",
+            text: readableError(result.error, "The password could not be reset."),
+          });
+          return;
+        }
+        setResetToken(null);
+        setMode("sign-in");
+        setPassword("");
+        setNotice({
+          tone: "success",
+          text: "Password reset complete. Sign in with your new password.",
+        });
+        return;
+      }
       if (mode === "sign-up") {
-        if (!demoMode) {
+        if (!registrationEnabled) {
           setNotice({
             tone: "info",
-            text: "Public self-service registration is disabled. Ask an organization owner for an invitation, or use enterprise SSO.",
+            text: "Self-service registration is currently disabled. Ask an organization owner for an invitation, or use enterprise SSO.",
           });
           return;
         }
         const result = await authClient.signUp.email({
-          callbackURL: callbackURL(),
+          callbackURL: verificationCallbackURL(),
           email: email.trim(),
           name: name.trim(),
           password,
@@ -74,11 +251,19 @@ export function LoginApp({ apiBaseUrl = "", demoMode = false }: LoginAppProps) {
           });
           return;
         }
+        if (demoMode) {
+          setNotice({
+            tone: "success",
+            text: "Local demo account created. Opening the control plane…",
+          });
+          window.location.assign(postAuthDestination());
+          return;
+        }
+        setMode("sign-in");
         setNotice({
           tone: "success",
-          text: "Local demo account created. Opening the control plane…",
+          text: "Account created. Check your inbox and verify your email before signing in.",
         });
-        window.location.assign("/app");
         return;
       }
 
@@ -94,7 +279,29 @@ export function LoginApp({ apiBaseUrl = "", demoMode = false }: LoginAppProps) {
         });
         return;
       }
-      window.location.assign("/app");
+      if (invitationId) {
+        setPending("invitation");
+        const invitationResult = await authClient.$fetch(
+          "/organization/accept-invitation",
+          {
+            method: "POST",
+            body: { invitationId },
+          }
+        );
+        if (invitationResult.error) {
+          setNotice({
+            tone: "error",
+            text: readableError(
+              invitationResult.error,
+              "Signed in, but the invitation could not be accepted."
+            ),
+          });
+          return;
+        }
+      } else {
+        await ensureActiveOrganization();
+      }
+      window.location.assign(postAuthDestination());
     } catch (cause) {
       setNotice({
         tone: "error",
@@ -228,7 +435,9 @@ export function LoginApp({ apiBaseUrl = "", demoMode = false }: LoginAppProps) {
               <strong>
                 {mode === "sign-in"
                   ? "Email and password"
-                  : "Create local demo account"}
+                  : demoMode
+                    ? "Create local demo account"
+                    : "Create account"}
               </strong>
             </div>
           </div>
@@ -244,38 +453,72 @@ export function LoginApp({ apiBaseUrl = "", demoMode = false }: LoginAppProps) {
               />
             </label>
           ) : null}
-          <label>
-            <span>Email</span>
-            <input
-              required
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@company.com"
-            />
-          </label>
-          <label>
-            <span>Password</span>
-            <input
-              required
-              minLength={12}
-              maxLength={128}
-              type="password"
-              autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-            <small>12–128 characters.</small>
-          </label>
+          {mode !== "reset" ? (
+            <label>
+              <span>Email</span>
+              <input
+                required
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@company.com"
+              />
+            </label>
+          ) : null}
+          {mode !== "forgot" ? (
+            <label>
+              <span>Password</span>
+              <input
+                required
+                minLength={12}
+                maxLength={128}
+                type="password"
+                autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+              <small>12–128 characters.</small>
+            </label>
+          ) : null}
           <button className="auth-submit" type="submit" disabled={pending !== null}>
             {pending === "password"
               ? "Authenticating…"
               : mode === "sign-in"
                 ? "Sign in"
-                : "Create demo account"}
+                : mode === "forgot"
+                  ? "Send reset link"
+                  : mode === "reset"
+                    ? "Set new password"
+                    : demoMode
+                      ? "Create demo account"
+                      : "Create account"}
           </button>
-          {demoMode ? (
+          {mode === "sign-in" && !demoMode ? (
+            <button
+              className="auth-mode"
+              type="button"
+              onClick={() => {
+                setMode("forgot");
+                setNotice(null);
+              }}
+            >
+              Forgot your password?
+            </button>
+          ) : null}
+          {mode === "forgot" || mode === "reset" ? (
+            <button
+              className="auth-mode"
+              type="button"
+              onClick={() => {
+                setMode("sign-in");
+                setNotice(null);
+              }}
+            >
+              Return to sign in
+            </button>
+          ) : null}
+          {registrationEnabled ? (
             <button
               className="auth-mode"
               type="button"
@@ -284,7 +527,13 @@ export function LoginApp({ apiBaseUrl = "", demoMode = false }: LoginAppProps) {
                 setNotice(null);
               }}
             >
-              {mode === "sign-in" ? "Create a local demo account" : "Return to sign in"}
+              {mode === "sign-in"
+                ? demoMode
+                  ? "Create a local demo account"
+                  : "Create an account"
+                : mode === "sign-up"
+                  ? "Return to sign in"
+                  : "Create an account"}
             </button>
           ) : (
             <p className="auth-invite-note">
@@ -310,6 +559,8 @@ export function LoginApp({ apiBaseUrl = "", demoMode = false }: LoginAppProps) {
 
       <footer className="auth-footer">
         <a href="/security">Security</a>
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
         <a href="/docs">Documentation</a>
         <a href="/enterprise">Enterprise</a>
       </footer>

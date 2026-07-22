@@ -14,6 +14,7 @@
   "dependencies": {
     "@hono/node-server": "catalog:",
     "@litemcp/adapter-mongodb": "workspace:*",
+    "@litemcp/analytics": "workspace:*",
     "@litemcp/auth": "workspace:*",
     "@litemcp/contracts": "workspace:*",
     "@litemcp/core": "workspace:*",

@@ -1,4 +1,4 @@
-name: Deploy managed cloud
+name: Deploy customer-owned Cloudflare reference
 
 on:
   workflow_dispatch:
@@ -23,10 +23,20 @@ env:
 
 jobs:
   deploy:
-    name: Deploy and baseline-smoke managed cloud
+    name: Deploy and smoke customer-owned reference
     if: >-
-      (github.event_name == 'workflow_dispatch' || vars.MANAGED_CLOUD_AUTO_DEPLOY == 'true') &&
-      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+      vars.CUSTOMER_OWNED_REFERENCE_DEPLOY == 'true' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'workflow_run' &&
+          vars.MANAGED_CLOUD_AUTO_DEPLOY == 'true' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_branch == 'main' &&
+          github.event.workflow_run.head_repository.full_name == github.repository
+        )
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment:
@@ -37,6 +47,10 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       MANAGED_CLOUD_URL: ${{ vars.MANAGED_CLOUD_URL }}
       MANAGED_CLOUD_RESOURCES_READY: ${{ vars.MANAGED_CLOUD_RESOURCES_READY }}
+      MANAGED_CLOUD_MCP_ENDPOINT: ${{ vars.MANAGED_CLOUD_MCP_ENDPOINT }}
+      MANAGED_CLOUD_MCP_TOKEN: ${{ secrets.MANAGED_CLOUD_MCP_TOKEN }}
+      MANAGED_CLOUD_MCP_TOOL_NAME: ${{ vars.MANAGED_CLOUD_MCP_TOOL_NAME }}
+      MANAGED_CLOUD_MCP_TOOL_ARGUMENTS_JSON: ${{ vars.MANAGED_CLOUD_MCP_TOOL_ARGUMENTS_JSON }}
     steps:
       - name: Check required deployment configuration
         shell: bash
@@ -90,9 +104,9 @@ jobs:
         run: pnpm --filter @litemcp/managed-cloud db:migrate:remote
       - name: Deploy managed cloud
         run: pnpm managed-cloud:deploy
-      - name: Run public baseline smoke
+      - name: Run public and configured authenticated smoke
         run: ./scripts/smoke-managed-cloud.sh
       - name: Record acceptance boundary
         run: >-
           printf '%s\n'
-          'Deployment and public baseline smoke passed. Live identity-provider, authenticated control-plane, scoped MCP, audit, and rollback acceptance must still be recorded before production-readiness is claimed.'
+          'Deployment smoke passed. Authenticated MCP is covered only when its optional smoke variables were configured; identity/session issuance, audit correlation, revocation, rollback, load, and external security acceptance remain separate release gates.'

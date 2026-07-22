@@ -1,0 +1,114 @@
+name: Deploy customer-owned Cloudflare reference staging
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - CI
+    branches:
+      - main
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: managed-cloud-staging
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: 24.11.1
+  PNPM_VERSION: 10.30.2
+
+jobs:
+  deploy:
+    name: Deploy and smoke customer-owned reference staging
+    if: >-
+      vars.CUSTOMER_OWNED_REFERENCE_DEPLOY == 'true' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'workflow_run' &&
+          vars.MANAGED_CLOUD_STAGING_AUTO_DEPLOY == 'true' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_branch == 'main' &&
+          github.event.workflow_run.head_repository.full_name == github.repository
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: managed-cloud-staging
+      url: ${{ vars.MANAGED_CLOUD_STAGING_URL }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      MANAGED_CLOUD_URL: ${{ vars.MANAGED_CLOUD_STAGING_URL }}
+      MANAGED_CLOUD_RESOURCES_READY: ${{ vars.MANAGED_CLOUD_STAGING_RESOURCES_READY }}
+      MANAGED_CLOUD_MCP_ENDPOINT: ${{ vars.MANAGED_CLOUD_STAGING_MCP_ENDPOINT }}
+      MANAGED_CLOUD_MCP_TOKEN: ${{ secrets.MANAGED_CLOUD_STAGING_MCP_TOKEN }}
+      MANAGED_CLOUD_MCP_TOOL_NAME: ${{ vars.MANAGED_CLOUD_STAGING_MCP_TOOL_NAME }}
+      MANAGED_CLOUD_MCP_TOOL_ARGUMENTS_JSON: ${{ vars.MANAGED_CLOUD_STAGING_MCP_TOOL_ARGUMENTS_JSON }}
+    steps:
+      - name: Check required staging configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$MANAGED_CLOUD_URL"
+          test "$MANAGED_CLOUD_RESOURCES_READY" = "true"
+          case "$MANAGED_CLOUD_URL" in
+            https://*) ;;
+            *) printf 'MANAGED_CLOUD_STAGING_URL must be an HTTPS origin.\n' >&2; exit 1 ;;
+          esac
+      - name: Check out the validated revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Verify staging isolation and checked-in resource IDs
+        run: node scripts/check-managed-cloud-wrangler.mjs --require-staging-resource-ids
+      - name: Verify the checked-in staging origin matches the deployment
+        run: |
+          node --input-type=module - <<'NODE'
+          import { readFileSync } from "node:fs";
+
+          const config = JSON.parse(
+            readFileSync("apps/managed-cloud/wrangler.jsonc", "utf8")
+          ).env?.staging;
+          const expected = process.env.MANAGED_CLOUD_URL.replace(/\/$/, "");
+          const publicOrigin = String(config?.vars?.PUBLIC_ORIGIN ?? "").replace(
+            /\/$/,
+            ""
+          );
+          const webOrigins = String(config?.vars?.WEB_ORIGINS ?? "")
+            .split(",")
+            .map((origin) => origin.trim().replace(/\/$/, ""));
+          if (publicOrigin !== expected || !webOrigins.includes(expected)) {
+            throw new Error(
+              "wrangler.jsonc env.staging PUBLIC_ORIGIN and WEB_ORIGINS must include the exact MANAGED_CLOUD_STAGING_URL."
+            );
+          }
+          NODE
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify Wrangler identity
+        run: pnpm --filter @litemcp/managed-cloud exec wrangler whoami
+      - name: Apply checked-in staging D1 migrations
+        run: pnpm --filter @litemcp/managed-cloud db:migrate:staging
+      - name: Deploy managed-cloud staging
+        run: pnpm --filter @litemcp/managed-cloud deploy:staging
+      - name: Run staging public and configured authenticated smoke
+        run: ./scripts/smoke-managed-cloud.sh
+      - name: Record staging acceptance boundary
+        run: >-
+          printf '%s\n'
+          'Staging deployment smoke passed. This is pre-production evidence only; production promotion remains separately environment-gated, and every omitted acceptance check remains unproven.'

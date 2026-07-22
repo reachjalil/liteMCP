@@ -35,8 +35,10 @@ docker compose -f deploy/docker-compose/compose.yaml config
 pnpm docker:up
 ```
 
-Use this for a disposable or controlled evaluation. The checked-in stack does
-not yet claim production Mongo authentication or a recorded restore exercise.
+Use this for a disposable or controlled evaluation. The checked-in stack enables
+Mongo client authentication and replica-set keyfile authentication, but uses a
+single member and the bootstrap/root account. It has no recorded complete-stack
+or restore exercise and is not a production database topology.
 
 ### Kubernetes
 
@@ -92,17 +94,26 @@ At a frequency appropriate to the environment:
 
 - review error rate, latency, timeout, and bounded-response failures;
 - review denied, approval-required, and revocation events;
+- when Insight is enabled, compare the tenant dashboard with exact `/usage`,
+  inspect analytics drop/failure counters, and verify that recent events never
+  contain arguments or results;
 - confirm Mongo replication, capacity, backup freshness, and restore sampling;
 - review IdP/SCIM sync failures and authorization-version lag once implemented;
 - validate certificate and provider-secret expiry;
 - review upstream DNS/egress changes and allowlists;
-- confirm audit retention and export jobs;
+- confirm audit retention/export jobs separately from Mongo analytics TTL or
+  the managed count-capped feed;
 - scan images/dependencies and rebuild from the supported branch;
 - exercise one allowed and denied MCP capability from an approved client.
 
-OpenTelemetry, SIEM export, quotas, and production dashboards are designed but
-not complete in the current slice. Operators must supply compensating platform
-monitoring until those surfaces ship.
+The working tree includes payload-free tenant analytics APIs and six console
+views, but they have no deployment, browser, named-client, or load acceptance.
+Managed queries read a capped exact feed and do not query Analytics Engine SQL;
+the Live view polls and has no WebSocket/SSE transport. OpenTelemetry, configured
+alerts, weekly digests, and SIEM export remain absent (O-F is outstanding).
+Fixed organization quotas and request-correlated Sentry also have no deployed
+alert or capacity evidence. Operators must supply compensating platform
+monitoring until those surfaces pass acceptance.
 
 ## Backup and restore
 
@@ -159,8 +170,9 @@ evidence. Do not return a provider token to an MCP client.
 - stop sensitive dispatch if pre-dispatch evidence cannot be written;
 - preserve database snapshots and application logs;
 - compare sequence/hash continuity per tenant;
-- treat Workers KV audit ordering as insufficient for production multi-writer
-  assurance until a strongly consistent coordinator exists.
+- verify that the current per-tenant Durable Object audit authority is deployed
+  and migrated; its per-document serialization still does not provide a
+  transactional outbox or an externally anchored ledger.
 
 ### SSRF or unexpected egress
 

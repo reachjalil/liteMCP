@@ -43,9 +43,9 @@ const { page } = Astro.props;
         <dt>Preview</dt>
         <dd>Useful implementation exists, but the complete operating journey is not proven.</dd>
         <dt>Planned</dt>
-        <dd>Part of the open MCP-native roadmap, not current product behavior.</dd>
+        <dd>Part of the public product roadmap, not current product behavior.</dd>
         <dt>Deployment</dt>
-        <dd>Managed cloud and self-hosted targets share portable packages; live parity remains an acceptance test.</dd>
+        <dd>Managed cloud consumes the portable public product core; its private service-control plane is not required by self-hosting.</dd>
       </dl>
     </div>
   </section>
@@ -96,7 +96,7 @@ const { page } = Astro.props;
     <div class="shell cta-panel">
       <div>
         <h2>Evaluate locally or inspect either deployment target.</h2>
-        <p>The managed cloud and Kubernetes paths are previews of one open codebase, with no intended capability gate or mandatory call-home path.</p>
+        <p>Both paths use the complete public product core. Managed cloud adds private operated-service tooling, while self-hosting remains independent and call-home-free.</p>
       </div>
       <div class="cta-panel__actions">
         <a class="button button--primary" href="/cloud">Managed cloud preview</a>

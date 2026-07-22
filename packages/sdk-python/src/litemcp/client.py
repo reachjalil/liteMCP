@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import base64
 import json
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import quote
 from urllib.error import HTTPError
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 
@@ -58,12 +59,17 @@ class LiteMCPClient:
         return headers
 
     def _request(
-        self, path: str, *, method: str = "GET", body: dict[str, Any] | None = None
+        self,
+        path: str,
+        *,
+        method: str = "GET",
+        body: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> Any:
         payload = _json_request(
             f"{self.base_url.rstrip('/')}{path}",
             method=method,
-            headers=self._headers(),
+            headers={**self._headers(), **(headers or {})},
             body=body,
         )
         if "data" not in payload:
@@ -73,11 +79,98 @@ class LiteMCPClient:
     def overview(self) -> dict[str, Any]:
         return self._request("/api/v1/overview")
 
+    def environments(self) -> list[dict[str, Any]]:
+        return self._request("/api/v1/environments")
+
     def servers(self) -> list[dict[str, Any]]:
         return self._request("/api/v1/servers")
 
+    def create_server(self, server: dict[str, Any]) -> dict[str, Any]:
+        return self._request("/api/v1/servers", method="POST", body=server)
+
+    def update_server(
+        self, server_id: str, changes: dict[str, Any]
+    ) -> dict[str, Any]:
+        return self._request(
+            f"/api/v1/servers/{quote(server_id, safe='')}",
+            method="PATCH",
+            body=changes,
+        )
+
+    def delete_server(self, server_id: str) -> dict[str, Any]:
+        return self._request(
+            f"/api/v1/servers/{quote(server_id, safe='')}", method="DELETE"
+        )
+
+    def probe_server(
+        self, server_id: str, *, accept_drift: bool = False
+    ) -> dict[str, Any]:
+        return self._request(
+            f"/api/v1/servers/{quote(server_id, safe='')}/probe",
+            method="POST",
+            body={"acceptDrift": accept_drift},
+        )
+
     def compositions(self) -> list[dict[str, Any]]:
         return self._request("/api/v1/compositions")
+
+    def create_composition(self, composition: dict[str, Any]) -> dict[str, Any]:
+        return self._request(
+            "/api/v1/compositions", method="POST", body=composition
+        )
+
+    def update_composition(
+        self, composition_id: str, changes: dict[str, Any]
+    ) -> dict[str, Any]:
+        return self._request(
+            f"/api/v1/compositions/{quote(composition_id, safe='')}",
+            method="PATCH",
+            body=changes,
+        )
+
+    def publish_composition(self, composition_id: str) -> dict[str, Any]:
+        return self._request(
+            f"/api/v1/compositions/{quote(composition_id, safe='')}/publish",
+            method="POST",
+        )
+
+    def delete_composition(self, composition_id: str) -> dict[str, Any]:
+        return self._request(
+            f"/api/v1/compositions/{quote(composition_id, safe='')}",
+            method="DELETE",
+        )
+
+    def policies(self) -> list[dict[str, Any]]:
+        return self._request("/api/v1/policies")
+
+    def create_policy(self, policy: dict[str, Any]) -> dict[str, Any]:
+        return self._request("/api/v1/policies", method="POST", body=policy)
+
+    def update_policy(
+        self, policy_id: str, changes: dict[str, Any]
+    ) -> dict[str, Any]:
+        return self._request(
+            f"/api/v1/policies/{quote(policy_id, safe='')}",
+            method="PATCH",
+            body=changes,
+        )
+
+    def lint_policy(self, policy_id: str) -> dict[str, Any]:
+        return self._request(
+            f"/api/v1/policies/{quote(policy_id, safe='')}/lint"
+        )
+
+    def activate_policy(self, policy_id: str) -> dict[str, Any]:
+        return self._request(
+            f"/api/v1/policies/{quote(policy_id, safe='')}/activate",
+            method="POST",
+        )
+
+    def archive_policy(self, policy_id: str) -> dict[str, Any]:
+        return self._request(
+            f"/api/v1/policies/{quote(policy_id, safe='')}/archive",
+            method="POST",
+        )
 
     def simulate_policy(self, decision_input: dict[str, Any]) -> dict[str, Any]:
         return self._request(
@@ -92,6 +185,144 @@ class LiteMCPClient:
         return self._request(
             f"/api/v1/sessions/{quote(session_id, safe='')}/revoke", method="POST"
         )
+
+    def sessions(self) -> list[dict[str, Any]]:
+        return self._request("/api/v1/sessions")
+
+    def audit(self, *, limit: int = 100) -> list[dict[str, Any]]:
+        return self._request(f"/api/v1/audit?{urlencode({'limit': limit})}")
+
+    def roles(self) -> list[dict[str, Any]]:
+        return self._request("/api/v1/roles")
+
+    def create_role(self, role: dict[str, Any]) -> dict[str, Any]:
+        return self._request("/api/v1/roles", method="POST", body=role)
+
+    def update_role(self, role_id: str, changes: dict[str, Any]) -> dict[str, Any]:
+        return self._request(
+            f"/api/v1/roles/{quote(role_id, safe='')}",
+            method="PATCH",
+            body=changes,
+        )
+
+    def delete_role(self, role_id: str) -> dict[str, Any]:
+        return self._request(
+            f"/api/v1/roles/{quote(role_id, safe='')}", method="DELETE"
+        )
+
+    def role_assignments(
+        self, *, subject_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        query = f"?{urlencode({'subjectId': subject_id})}" if subject_id else ""
+        return self._request(f"/api/v1/role-assignments{query}")
+
+    def assign_role(self, assignment: dict[str, Any]) -> dict[str, Any]:
+        return self._request(
+            "/api/v1/role-assignments", method="POST", body=assignment
+        )
+
+    def remove_role_assignment(self, assignment_id: str) -> dict[str, Any]:
+        return self._request(
+            f"/api/v1/role-assignments/{quote(assignment_id, safe='')}",
+            method="DELETE",
+        )
+
+    def identity_providers(self) -> list[dict[str, Any]]:
+        return self._request("/api/v1/identity-providers")
+
+    def create_identity_provider(self, provider: dict[str, Any]) -> dict[str, Any]:
+        return self._request(
+            "/api/v1/identity-providers", method="POST", body=provider
+        )
+
+    def update_identity_provider(
+        self, provider_id: str, changes: dict[str, Any]
+    ) -> dict[str, Any]:
+        return self._request(
+            f"/api/v1/identity-providers/{quote(provider_id, safe='')}",
+            method="PATCH",
+            body=changes,
+        )
+
+    def delete_identity_provider(self, provider_id: str) -> dict[str, Any]:
+        return self._request(
+            f"/api/v1/identity-providers/{quote(provider_id, safe='')}",
+            method="DELETE",
+        )
+
+    def approvals(self) -> list[dict[str, Any]]:
+        return self._request("/api/v1/approvals")
+
+    def decide_approval(
+        self,
+        approval_id: str,
+        *,
+        decision: str,
+        reason: str,
+        generation: int,
+        fingerprint: str,
+    ) -> dict[str, Any]:
+        return self._request(
+            f"/api/v1/approvals/{quote(approval_id, safe='')}/decision",
+            method="POST",
+            body={
+                "decision": decision,
+                "reason": reason,
+                "generation": generation,
+                "fingerprint": fingerprint,
+            },
+        )
+
+    def authority(self) -> dict[str, Any]:
+        return self._request("/api/v1/authority")
+
+    def freeze(self, *, reason: str | None = None) -> dict[str, Any]:
+        return self._request(
+            "/api/v1/tenant/freeze",
+            method="POST",
+            body={"reason": reason} if reason else {},
+        )
+
+    def unfreeze(self) -> dict[str, Any]:
+        return self._request("/api/v1/tenant/unfreeze", method="POST")
+
+    def create_service_principal(self, principal: dict[str, Any]) -> dict[str, Any]:
+        return self._request(
+            "/api/v1/service-principals", method="POST", body=principal
+        )
+
+    def create_service_principal_session(
+        self,
+        session_input: dict[str, Any],
+        *,
+        client_id: str,
+        secret: str,
+    ) -> "MCPSession":
+        credentials = base64.b64encode(f"{client_id}:{secret}".encode()).decode()
+        issued = self._request(
+            "/api/v1/service-principal-sessions",
+            method="POST",
+            body=session_input,
+            headers={"Authorization": f"Basic {credentials}"},
+        )
+        return MCPSession(endpoint=issued["endpoint"], token=issued["token"])
+
+    def deprovision_subject(self, subject_id: str) -> dict[str, Any]:
+        return self._request(
+            f"/api/v1/subjects/{quote(subject_id, safe='')}/deprovision",
+            method="POST",
+        )
+
+    def activation_events(self) -> list[dict[str, Any]]:
+        return self._request("/api/v1/activation-events")
+
+    def export_configuration(self) -> dict[str, Any]:
+        return self._request("/api/v1/export")
+
+    def import_configuration(
+        self, configuration: dict[str, Any]
+    ) -> dict[str, Any]:
+        return self._request("/api/v1/import", method="POST", body=configuration)
 
 
 @dataclass(slots=True)

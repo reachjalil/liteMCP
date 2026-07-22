@@ -1,24 +1,44 @@
 import type {
+  ApprovalDecisionInput,
   ApprovalRequest,
   AuditEvent,
   Composition,
   CreateCompositionInput,
+  CreateIdentityProviderInput,
+  CreatePolicyInput,
+  CreateRoleInput,
   CreateServerInput,
+  CreateServicePrincipalInput,
   CreateSessionInput,
+  Environment,
+  GatewaySession,
   IdentityProvider,
   McpServerDefinition,
   PlatformOverview,
   Policy,
   PolicyDecision,
+  PolicyRule,
   PolicySimulationInput,
   RiskClass,
+  Role,
+  RoleAssignment,
+  TenantAuthority,
   Transport,
 } from "@litemcp/contracts";
 import type { ReactNode, SubmitEvent } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
-import { ApiClientError, type IssuedSession, LiteMcpApiClient } from "../../lib/api";
+import {
+  type ActivationEvent,
+  ApiClientError,
+  type IssuedServicePrincipal,
+  type IssuedSession,
+  LiteMcpApiClient,
+  type PolicyLint,
+} from "../../lib/api";
 import "../../styles/console.css";
+
+const ObservabilityArea = lazy(() => import("./observability/ObservabilityArea"));
 
 type ConsoleArea =
   | "overview"
@@ -112,6 +132,90 @@ const displayDate = (value: string) => {
   }).format(date);
 };
 
+const confirmAction = (message: string) =>
+  typeof window === "undefined" || window.confirm(message);
+
+const copyText = async (value: string) => {
+  if (typeof navigator === "undefined" || !navigator.clipboard) {
+    throw new Error("Clipboard access is unavailable in this browser.");
+  }
+  await navigator.clipboard.writeText(value);
+};
+
+const downloadJson = (filename: string, value: unknown) => {
+  const blob = new Blob([`${JSON.stringify(value, null, 2)}\n`], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.hidden = true;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+};
+
+const sessionSetupSnippets = (issued: IssuedSession) => {
+  const authorization = `Bearer ${issued.token}`;
+  return [
+    {
+      id: "cursor",
+      label: "Cursor",
+      location: "~/.cursor/mcp.json",
+      value: JSON.stringify(
+        {
+          mcpServers: {
+            litemcp: {
+              url: issued.endpoint,
+              headers: { Authorization: authorization },
+            },
+          },
+        },
+        null,
+        2
+      ),
+    },
+    {
+      id: "claude-code",
+      label: "Claude Code",
+      location: ".mcp.json",
+      value: JSON.stringify(
+        {
+          mcpServers: {
+            litemcp: {
+              type: "http",
+              url: issued.endpoint,
+              headers: { Authorization: authorization },
+            },
+          },
+        },
+        null,
+        2
+      ),
+    },
+    {
+      id: "vscode",
+      label: "VS Code",
+      location: ".vscode/mcp.json",
+      value: JSON.stringify(
+        {
+          servers: {
+            litemcp: {
+              type: "http",
+              url: issued.endpoint,
+              headers: { Authorization: authorization },
+            },
+          },
+        },
+        null,
+        2
+      ),
+    },
+  ];
+};
+
 const errorNotice = (cause: unknown, fallback: string): Notice => {
   if (cause instanceof ApiClientError) {
     return {
@@ -134,11 +238,22 @@ const StatusBadge = ({ value }: { value: string }) => {
     "allowed",
     "succeeded",
     "approved",
+    "valid",
+    "ready",
   ].includes(value)
     ? "positive"
     : ["degraded", "pending", "draft", "require-approval"].includes(value)
       ? "warning"
-      : ["offline", "denied", "failed"].includes(value)
+      : [
+            "offline",
+            "denied",
+            "failed",
+            "frozen",
+            "revoked",
+            "expired",
+            "disabled",
+            "conflicts",
+          ].includes(value)
         ? "negative"
         : "neutral";
   return <span className={`console-badge console-badge--${tone}`}>{value}</span>;
@@ -205,15 +320,24 @@ export function ConsoleApp({
   apiBaseUrl = "",
   defaultDemoMode = false,
 }: ConsoleAppProps) {
-  const [area, setArea] = useState<ConsoleArea>(readInitialArea);
-  const [demoMode, setDemoMode] = useState(() => readInitialDemoMode(defaultDemoMode));
+  // Keep the server and first client render identical. URL-derived state is applied
+  // after hydration so bookmarked console areas never trigger a hydration mismatch.
+  const [area, setArea] = useState<ConsoleArea>("overview");
+  const [demoMode, setDemoMode] = useState(defaultDemoMode);
+  const [hydrated, setHydrated] = useState(false);
   const [overview, setOverview] = useState<PlatformOverview | null>(null);
+  const [environments, setEnvironments] = useState<Environment[]>([]);
   const [servers, setServers] = useState<McpServerDefinition[]>([]);
   const [compositions, setCompositions] = useState<Composition[]>([]);
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [identityProviders, setIdentityProviders] = useState<IdentityProvider[]>([]);
   const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
+  const [sessions, setSessions] = useState<GatewaySession[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [roleAssignments, setRoleAssignments] = useState<RoleAssignment[]>([]);
+  const [activationEvents, setActivationEvents] = useState<ActivationEvent[]>([]);
+  const [authority, setAuthority] = useState<TenantAuthority | null>(null);
   const [loadState, setLoadState] = useState<LoadState>({
     loading: true,
     errors: [],
@@ -241,28 +365,45 @@ export function ConsoleApp({
     setLoadState((current) => ({ ...current, loading: true, errors: [] }));
     const results = await Promise.allSettled([
       client.getOverview(),
+      client.getEnvironments(),
       client.getServers(),
       client.getCompositions(),
       client.getPolicies(),
       client.getAuditEvents(),
       client.getIdentityProviders(),
       client.getApprovals(),
+      client.getSessions(),
+      client.getRoles(),
+      client.getRoleAssignments(),
+      client.getActivationEvents(),
+      client.getAuthority(),
     ]);
 
     const errors: string[] = [];
     const [
       overviewResult,
+      environmentsResult,
       serversResult,
       compositionsResult,
       policiesResult,
       auditResult,
       providersResult,
       approvalsResult,
+      sessionsResult,
+      rolesResult,
+      assignmentsResult,
+      activationResult,
+      authorityResult,
     ] = results;
 
     if (overviewResult?.status === "fulfilled") setOverview(overviewResult.value.data);
     else if (overviewResult?.status === "rejected")
       errors.push(errorNotice(overviewResult.reason, "Overview failed.").text);
+
+    if (environmentsResult?.status === "fulfilled")
+      setEnvironments(environmentsResult.value.data);
+    else if (environmentsResult?.status === "rejected")
+      errors.push(errorNotice(environmentsResult.reason, "Environments failed.").text);
 
     if (serversResult?.status === "fulfilled") setServers(serversResult.value.data);
     else if (serversResult?.status === "rejected")
@@ -293,6 +434,33 @@ export function ConsoleApp({
     else if (approvalsResult?.status === "rejected")
       errors.push(errorNotice(approvalsResult.reason, "Approval queue failed.").text);
 
+    if (sessionsResult?.status === "fulfilled") setSessions(sessionsResult.value.data);
+    else if (sessionsResult?.status === "rejected")
+      errors.push(errorNotice(sessionsResult.reason, "Sessions failed.").text);
+
+    if (rolesResult?.status === "fulfilled") setRoles(rolesResult.value.data);
+    else if (rolesResult?.status === "rejected")
+      errors.push(errorNotice(rolesResult.reason, "Roles failed.").text);
+
+    if (assignmentsResult?.status === "fulfilled")
+      setRoleAssignments(assignmentsResult.value.data);
+    else if (assignmentsResult?.status === "rejected")
+      errors.push(
+        errorNotice(assignmentsResult.reason, "Role assignments failed.").text
+      );
+
+    if (activationResult?.status === "fulfilled")
+      setActivationEvents(activationResult.value.data);
+    else if (activationResult?.status === "rejected")
+      errors.push(
+        errorNotice(activationResult.reason, "Activation funnel failed.").text
+      );
+
+    if (authorityResult?.status === "fulfilled")
+      setAuthority(authorityResult.value.data);
+    else if (authorityResult?.status === "rejected")
+      errors.push(errorNotice(authorityResult.reason, "Authority state failed.").text);
+
     setLoadState({
       loading: false,
       errors: [...new Set(errors)],
@@ -301,8 +469,15 @@ export function ConsoleApp({
   }, [client]);
 
   useEffect(() => {
+    setArea(readInitialArea());
+    setDemoMode(readInitialDemoMode(defaultDemoMode));
+    setHydrated(true);
+  }, [defaultDemoMode]);
+
+  useEffect(() => {
+    if (!hydrated) return;
     void refresh();
-  }, [refresh]);
+  }, [hydrated, refresh]);
 
   useEffect(() => {
     const handleHashChange = () => setArea(readInitialArea());
@@ -455,6 +630,8 @@ export function ConsoleApp({
               overview={overview}
               servers={servers}
               compositions={compositions}
+              sessions={sessions}
+              activationEvents={activationEvents}
               auditEvents={auditEvents}
               loading={loadState.loading}
               activateArea={activateArea}
@@ -477,12 +654,14 @@ export function ConsoleApp({
                 void refresh();
               }}
               onError={(nextNotice) => setNotice(nextNotice)}
+              onChanged={() => void refresh()}
             />
           ) : null}
           {area === "composer" ? (
             <ComposerArea
               client={client}
               overview={overview}
+              environments={environments}
               servers={servers}
               compositions={compositions}
               onCreated={(composition, requestId) => {
@@ -498,6 +677,7 @@ export function ConsoleApp({
                 void refresh();
               }}
               onError={(nextNotice) => setNotice(nextNotice)}
+              onChanged={() => void refresh()}
               activateArea={activateArea}
             />
           ) : null}
@@ -506,29 +686,60 @@ export function ConsoleApp({
               client={client}
               demoMode={demoMode}
               overview={overview}
+              environments={environments}
               compositions={compositions}
+              sessions={sessions}
+              roles={roles}
+              assignments={roleAssignments}
               providers={identityProviders}
               onNotice={setNotice}
+              onChanged={() => void refresh()}
             />
           ) : null}
           {area === "policy" ? (
-            <PolicyArea client={client} policies={policies} onNotice={setNotice} />
+            <PolicyArea
+              client={client}
+              policies={policies}
+              onNotice={setNotice}
+              onChanged={() => void refresh()}
+            />
           ) : null}
           {area === "approvals" ? (
             <ApprovalsArea
+              client={client}
               approvals={approvals}
               events={pendingAudit}
               pendingCount={overview?.counts.pendingApprovals ?? 0}
+              onNotice={setNotice}
+              onChanged={() => void refresh()}
             />
           ) : null}
           {area === "observability" ? (
-            <ObservabilityArea overview={overview} events={auditEvents} />
+            <Suspense
+              fallback={
+                <div className="analytics-view-state" role="status">
+                  Loading usage observability…
+                </div>
+              }
+            >
+              <ObservabilityArea
+                client={client}
+                gatewayStatus={overview?.gateway.status ?? "unknown"}
+                auditEvents={auditEvents}
+              />
+            </Suspense>
           ) : null}
           {area === "settings" ? (
             <SettingsArea
+              client={client}
               overview={overview}
+              environments={environments}
               apiBaseUrl={apiBaseUrl}
               demoMode={demoMode}
+              authority={authority}
+              onAuthority={setAuthority}
+              onNotice={setNotice}
+              onChanged={() => void refresh()}
             />
           ) : null}
         </main>
@@ -556,6 +767,8 @@ function OverviewArea({
   overview,
   servers,
   compositions,
+  sessions,
+  activationEvents,
   auditEvents,
   loading,
   activateArea,
@@ -563,6 +776,8 @@ function OverviewArea({
   overview: PlatformOverview | null;
   servers: McpServerDefinition[];
   compositions: Composition[];
+  sessions: GatewaySession[];
+  activationEvents: ActivationEvent[];
   auditEvents: AuditEvent[];
   loading: boolean;
   activateArea: (area: ConsoleArea) => void;
@@ -576,6 +791,46 @@ function OverviewArea({
     ["Pending approvals", counts?.pendingApprovals ?? 0, "approvals"],
     ["Audit events", counts?.auditEvents ?? auditEvents.length, "observability"],
   ] as const;
+  const reached = new Set(activationEvents.map((event) => event.name));
+  const onboardingSteps = [
+    {
+      label: "Register an MCP server",
+      detail: servers.length ? `${servers.length} registered` : "Add a real upstream",
+      done: reached.has("server_registered") || servers.length > 0,
+      target: "catalog" as const,
+    },
+    {
+      label: "Probe and import tools",
+      detail: "Discover capability schemas from the upstream",
+      done:
+        reached.has("server_probed") ||
+        servers.some(
+          (server) => server.status !== "unprobed" && server.tools.length > 0
+        ),
+      target: "catalog" as const,
+    },
+    {
+      label: "Publish a composition",
+      detail: "Create a stable, namespaced endpoint",
+      done:
+        reached.has("composition_published") ||
+        compositions.some((composition) => composition.status === "published"),
+      target: "composer" as const,
+    },
+    {
+      label: "Issue scoped access",
+      detail: "Mint a short-lived token for your client",
+      done: reached.has("session_issued") || sessions.length > 0,
+      target: "identity" as const,
+    },
+    {
+      label: "Make the first tool call",
+      detail: "Validate the endpoint from Cursor, Claude Code, or VS Code",
+      done: reached.has("first_tool_call"),
+      target: "identity" as const,
+    },
+  ];
+  const completedSteps = onboardingSteps.filter((step) => step.done).length;
 
   return (
     <section className="console-area">
@@ -639,64 +894,31 @@ function OverviewArea({
           <header className="console-panel__header">
             <div>
               <span>Onboarding</span>
-              <h2>Publish a first endpoint</h2>
+              <h2>{completedSteps}/5 steps complete</h2>
             </div>
+            <span className="console-count">
+              {Math.round((completedSteps / onboardingSteps.length) * 100)}%
+            </span>
           </header>
-          <ol className="console-onboarding">
-            <li className={servers.length > 0 ? "is-done" : undefined}>
-              <span>1</span>
-              <div>
-                <strong>Register an MCP server</strong>
-                <small>
-                  {servers.length > 0
-                    ? `${servers.length} registered`
-                    : "Remote, stdio, or built in"}
-                </small>
-              </div>
-              <button type="button" onClick={() => activateArea("catalog")}>
-                Open
-              </button>
-            </li>
-            <li className={compositions.length > 0 ? "is-done" : undefined}>
-              <span>2</span>
-              <div>
-                <strong>Create a composition</strong>
-                <small>
-                  {compositions.length > 0
-                    ? `${compositions.length} created`
-                    : "Namespace and pin members"}
-                </small>
-              </div>
-              <button type="button" onClick={() => activateArea("composer")}>
-                Open
-              </button>
-            </li>
-            <li
-              className={
-                (overview?.counts.activePolicies ?? 0) > 0 ? "is-done" : undefined
-              }
-            >
-              <span>3</span>
-              <div>
-                <strong>Simulate policy</strong>
-                <small>Verify discovery and execution</small>
-              </div>
-              <button type="button" onClick={() => activateArea("policy")}>
-                Open
-              </button>
-            </li>
-            <li
-              className={(overview?.counts.sessions ?? 0) > 0 ? "is-done" : undefined}
-            >
-              <span>4</span>
-              <div>
-                <strong>Issue a scoped session</strong>
-                <small>Bind identity to the endpoint</small>
-              </div>
-              <button type="button" onClick={() => activateArea("identity")}>
-                Open
-              </button>
-            </li>
+          <ol className="console-onboarding" aria-label="First-run setup progress">
+            {onboardingSteps.map((step, index) => (
+              <li
+                key={step.label}
+                className={step.done ? "is-done" : undefined}
+                aria-current={
+                  !step.done && index === completedSteps ? "step" : undefined
+                }
+              >
+                <span>{step.done ? "✓" : index + 1}</span>
+                <div>
+                  <strong>{step.label}</strong>
+                  <small>{step.detail}</small>
+                </div>
+                <button type="button" onClick={() => activateArea(step.target)}>
+                  {step.done ? "Review" : "Start"}
+                </button>
+              </li>
+            ))}
           </ol>
         </section>
       </div>
@@ -725,13 +947,26 @@ function CatalogArea({
   servers,
   onCreated,
   onError,
+  onChanged,
 }: {
   client: LiteMcpApiClient;
   servers: McpServerDefinition[];
   onCreated: (server: McpServerDefinition, requestId: string) => void;
   onError: (notice: Notice) => void;
+  onChanged: () => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [editingServer, setEditingServer] = useState<McpServerDefinition | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    description: "",
+    endpoint: "",
+    command: "",
+    version: "",
+    visibility: "private" as "public" | "private" | "unlisted",
+    tags: "",
+  });
   const [form, setForm] = useState({
     name: "",
     slug: "",
@@ -783,6 +1018,101 @@ function CatalogArea({
     }
   };
 
+  const beginEdit = (server: McpServerDefinition) => {
+    setEditingServer(server);
+    setEditForm({
+      name: server.name,
+      description: server.description,
+      endpoint: server.endpoint ?? "",
+      command: server.command?.join(" ") ?? "",
+      version: server.version,
+      visibility: server.visibility,
+      tags: server.tags.join(", "),
+    });
+  };
+
+  const saveEdit = async (event: SubmitEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingServer) return;
+    setBusyId(editingServer.id);
+    try {
+      const result = await client.updateServer(editingServer.id, {
+        name: editForm.name.trim(),
+        description: editForm.description.trim(),
+        version: editForm.version.trim(),
+        visibility: editForm.visibility,
+        tags: splitList(editForm.tags),
+        ...(editingServer.transport === "stdio"
+          ? { command: splitCommand(editForm.command) }
+          : editingServer.transport === "streamable-http" ||
+              editingServer.transport === "legacy-sse"
+            ? { endpoint: editForm.endpoint.trim() }
+            : {}),
+      });
+      setEditingServer(null);
+      onError({
+        tone: "success",
+        text: `${result.data.name} was updated. Probe again to verify its capabilities.`,
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onError(errorNotice(cause, "Could not update the MCP server."));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const probe = async (server: McpServerDefinition) => {
+    const acceptDrift =
+      server.driftStatus === "drifted" &&
+      confirmAction(
+        `Accept the newly discovered tool schema for ${server.name}? This clears the drift quarantine.`
+      );
+    if (server.driftStatus === "drifted" && !acceptDrift) return;
+    setBusyId(server.id);
+    try {
+      const result = await client.probeServer(server.id, acceptDrift);
+      onError({
+        tone: result.data.status === "healthy" ? "success" : "info",
+        text:
+          result.data.status === "healthy"
+            ? `Imported ${result.data.tools.length} tools from ${result.data.name}.`
+            : (result.data.lastProbeError ?? `${result.data.name} probe completed.`),
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onError(errorNotice(cause, "Could not probe the MCP server."));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const remove = async (server: McpServerDefinition) => {
+    if (
+      !confirmAction(
+        `Delete ${server.name}? Remove it from every composition first. This cannot be undone.`
+      )
+    )
+      return;
+    setBusyId(server.id);
+    try {
+      const result = await client.deleteServer(server.id);
+      if (editingServer?.id === server.id) setEditingServer(null);
+      onError({
+        tone: "success",
+        text: `${server.name} was deleted.`,
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onError(errorNotice(cause, "Could not delete the MCP server."));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <section className="console-area">
       <AreaHeading
@@ -790,6 +1120,124 @@ function CatalogArea({
         title="MCP catalog"
         description="Register concrete upstream definitions and inspect their current health and capability inventory."
       />
+      {editingServer ? (
+        <section
+          className="console-panel console-editor"
+          aria-labelledby="server-editor-title"
+        >
+          <header className="console-panel__header">
+            <div>
+              <span>Edit server</span>
+              <h2 id="server-editor-title">{editingServer.name}</h2>
+            </div>
+            <button type="button" onClick={() => setEditingServer(null)}>
+              Cancel
+            </button>
+          </header>
+          <form className="console-form console-form--wide" onSubmit={saveEdit}>
+            <div className="console-form__row">
+              <label>
+                <span>Name</span>
+                <input
+                  required
+                  minLength={2}
+                  value={editForm.name}
+                  onChange={(event) =>
+                    setEditForm({ ...editForm, name: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                <span>Version</span>
+                <input
+                  required
+                  value={editForm.version}
+                  onChange={(event) =>
+                    setEditForm({ ...editForm, version: event.target.value })
+                  }
+                />
+              </label>
+            </div>
+            <label>
+              <span>Description</span>
+              <textarea
+                value={editForm.description}
+                onChange={(event) =>
+                  setEditForm({ ...editForm, description: event.target.value })
+                }
+              />
+            </label>
+            {editingServer.transport === "stdio" ? (
+              <label>
+                <span>Command</span>
+                <input
+                  required
+                  value={editForm.command}
+                  onChange={(event) =>
+                    setEditForm({ ...editForm, command: event.target.value })
+                  }
+                />
+              </label>
+            ) : editingServer.transport === "streamable-http" ||
+              editingServer.transport === "legacy-sse" ? (
+              <label>
+                <span>Endpoint URL</span>
+                <input
+                  required
+                  type="url"
+                  value={editForm.endpoint}
+                  onChange={(event) =>
+                    setEditForm({ ...editForm, endpoint: event.target.value })
+                  }
+                />
+              </label>
+            ) : null}
+            <div className="console-form__row">
+              <label>
+                <span>Visibility</span>
+                <select
+                  value={editForm.visibility}
+                  onChange={(event) =>
+                    setEditForm({
+                      ...editForm,
+                      visibility: event.target.value as typeof editForm.visibility,
+                    })
+                  }
+                >
+                  <option value="private">Private</option>
+                  <option value="unlisted">Unlisted</option>
+                  <option value="public">Public</option>
+                </select>
+              </label>
+              <label>
+                <span>Tags</span>
+                <input
+                  value={editForm.tags}
+                  onChange={(event) =>
+                    setEditForm({ ...editForm, tags: event.target.value })
+                  }
+                />
+              </label>
+            </div>
+            <div className="console-action-row">
+              <button
+                className="console-button console-button--primary"
+                type="submit"
+                disabled={busyId === editingServer.id}
+              >
+                {busyId === editingServer.id ? "Saving…" : "Save server"}
+              </button>
+              <button
+                className="console-button console-button--quiet"
+                type="button"
+                onClick={() => setEditingServer(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : null}
       <div className="console-split console-split--form">
         <section className="console-panel console-panel--table">
           <header className="console-panel__header">
@@ -810,6 +1258,7 @@ function CatalogArea({
                     <th>Tools</th>
                     <th>Status</th>
                     <th>Visibility</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -828,6 +1277,35 @@ function CatalogArea({
                         <StatusBadge value={server.status} />
                       </td>
                       <td>{server.visibility}</td>
+                      <td>
+                        <div className="console-row-actions">
+                          <button
+                            type="button"
+                            onClick={() => void probe(server)}
+                            disabled={busyId === server.id}
+                          >
+                            {busyId === server.id ? "Working…" : "Probe + import"}
+                          </button>
+                          <button type="button" onClick={() => beginEdit(server)}>
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="is-danger"
+                            onClick={() => void remove(server)}
+                            disabled={busyId === server.id}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                        {server.lastProbeError ? (
+                          <small title={server.lastProbeError}>
+                            Probe: {server.lastProbeError}
+                          </small>
+                        ) : server.lastProbedAt ? (
+                          <small>Probed {displayDate(server.lastProbedAt)}</small>
+                        ) : null}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -987,25 +1465,44 @@ function CatalogArea({
 function ComposerArea({
   client,
   overview,
+  environments,
   servers,
   compositions,
   onCreated,
   onError,
+  onChanged,
   activateArea,
 }: {
   client: LiteMcpApiClient;
   overview: PlatformOverview | null;
+  environments: Environment[];
   servers: McpServerDefinition[];
   compositions: Composition[];
   onCreated: (composition: Composition, requestId: string) => void;
   onError: (notice: Notice) => void;
+  onChanged: () => void;
   activateArea: (area: ConsoleArea) => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [editingComposition, setEditingComposition] = useState<Composition | null>(
+    null
+  );
+  const [editForm, setEditForm] = useState({
+    name: "",
+    description: "",
+    members: [] as Array<{
+      serverId: string;
+      selected: boolean;
+      namespace: string;
+      priority: number;
+    }>,
+  });
   const [form, setForm] = useState({
     name: "",
     slug: "",
     description: "",
+    environmentId: "",
     serverId: "",
     namespace: "",
   });
@@ -1021,9 +1518,18 @@ function ComposerArea({
     }
   }, [form.serverId, servers]);
 
+  useEffect(() => {
+    if (!form.environmentId && (environments[0] || overview?.environment)) {
+      setForm((current) => ({
+        ...current,
+        environmentId: environments[0]?.id ?? overview?.environment.id ?? "",
+      }));
+    }
+  }, [environments, form.environmentId, overview]);
+
   const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!overview || !selectedServer) {
+    if (!form.environmentId || !selectedServer) {
       onError({
         tone: "error",
         text: "Load an environment and register at least one MCP server first.",
@@ -1032,7 +1538,7 @@ function ComposerArea({
     }
     setSubmitting(true);
     const input: CreateCompositionInput = {
-      environmentId: overview.environment.id,
+      environmentId: form.environmentId,
       name: form.name.trim(),
       slug: form.slug.trim() || slugify(form.name),
       description: form.description.trim(),
@@ -1058,6 +1564,113 @@ function ComposerArea({
     }
   };
 
+  const beginEdit = (composition: Composition) => {
+    const currentByServer = new Map(
+      composition.members.map((member) => [member.serverId, member])
+    );
+    setEditingComposition(composition);
+    setEditForm({
+      name: composition.name,
+      description: composition.description,
+      members: servers.map((server) => {
+        const current = currentByServer.get(server.id);
+        return {
+          serverId: server.id,
+          selected: Boolean(current),
+          namespace: current?.namespace ?? server.slug,
+          priority: current?.priority ?? 100,
+        };
+      }),
+    });
+  };
+
+  const saveEdit = async (event: SubmitEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingComposition) return;
+    const members = editForm.members
+      .filter((member) => member.selected)
+      .flatMap((member) => {
+        const server = servers.find((candidate) => candidate.id === member.serverId);
+        if (!server) return [];
+        const current = editingComposition.members.find(
+          (candidate) => candidate.serverId === member.serverId
+        );
+        return [
+          {
+            serverId: member.serverId,
+            namespace: slugify(member.namespace) || server.slug,
+            enabled: current?.enabled ?? true,
+            pinnedVersion: server.version,
+            priority: member.priority,
+          },
+        ];
+      });
+    if (members.length === 0) {
+      onError({ tone: "error", text: "Select at least one composition member." });
+      return;
+    }
+    setBusyId(editingComposition.id);
+    try {
+      const result = await client.updateComposition(editingComposition.id, {
+        name: editForm.name.trim(),
+        description: editForm.description.trim(),
+        members,
+      });
+      setEditingComposition(null);
+      onError({
+        tone: "success",
+        text: `${result.data.name} was saved as a draft. Publish it to expose the change.`,
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onError(errorNotice(cause, "Could not update the composition."));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const publish = async (composition: Composition) => {
+    setBusyId(composition.id);
+    try {
+      const result = await client.publishComposition(composition.id);
+      onError({
+        tone: "success",
+        text: `${result.data.name} ${result.data.version} is published.`,
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onError(errorNotice(cause, "Could not publish the composition."));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const remove = async (composition: Composition) => {
+    if (
+      !confirmAction(
+        `Delete ${composition.name}? Active sessions must be revoked first. This cannot be undone.`
+      )
+    )
+      return;
+    setBusyId(composition.id);
+    try {
+      const result = await client.deleteComposition(composition.id);
+      if (editingComposition?.id === composition.id) setEditingComposition(null);
+      onError({
+        tone: "success",
+        text: `${composition.name} was deleted.`,
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onError(errorNotice(cause, "Could not delete the composition."));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <section className="console-area">
       <AreaHeading
@@ -1065,6 +1678,129 @@ function ComposerArea({
         title="Composer"
         description="Create versioned logical MCP endpoints from pinned, namespaced upstream members."
       />
+      {editingComposition ? (
+        <section
+          className="console-panel console-editor"
+          aria-labelledby="composition-editor-title"
+        >
+          <header className="console-panel__header">
+            <div>
+              <span>Edit composition</span>
+              <h2 id="composition-editor-title">{editingComposition.name}</h2>
+            </div>
+            <button type="button" onClick={() => setEditingComposition(null)}>
+              Cancel
+            </button>
+          </header>
+          <form className="console-form" onSubmit={saveEdit}>
+            <div className="console-form__row">
+              <label>
+                <span>Name</span>
+                <input
+                  required
+                  minLength={2}
+                  value={editForm.name}
+                  onChange={(event) =>
+                    setEditForm({ ...editForm, name: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                <span>Description</span>
+                <input
+                  value={editForm.description}
+                  onChange={(event) =>
+                    setEditForm({ ...editForm, description: event.target.value })
+                  }
+                />
+              </label>
+            </div>
+            <fieldset className="console-fieldset">
+              <legend>Members</legend>
+              <div className="console-member-editor">
+                {editForm.members.map((member, index) => {
+                  const server = servers.find(
+                    (candidate) => candidate.id === member.serverId
+                  );
+                  if (!server) return null;
+                  return (
+                    <div key={member.serverId}>
+                      <label className="console-check">
+                        <input
+                          type="checkbox"
+                          checked={member.selected}
+                          onChange={(event) => {
+                            const members = [...editForm.members];
+                            members[index] = {
+                              ...member,
+                              selected: event.target.checked,
+                            };
+                            setEditForm({ ...editForm, members });
+                          }}
+                        />
+                        <span>
+                          <strong>{server.name}</strong>
+                          <small>{server.version}</small>
+                        </span>
+                      </label>
+                      <label>
+                        <span>Namespace</span>
+                        <input
+                          required={member.selected}
+                          disabled={!member.selected}
+                          value={member.namespace}
+                          onChange={(event) => {
+                            const members = [...editForm.members];
+                            members[index] = {
+                              ...member,
+                              namespace: event.target.value,
+                            };
+                            setEditForm({ ...editForm, members });
+                          }}
+                        />
+                      </label>
+                      <label>
+                        <span>Priority</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={10000}
+                          disabled={!member.selected}
+                          value={member.priority}
+                          onChange={(event) => {
+                            const members = [...editForm.members];
+                            members[index] = {
+                              ...member,
+                              priority: Number(event.target.value),
+                            };
+                            setEditForm({ ...editForm, members });
+                          }}
+                        />
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            </fieldset>
+            <div className="console-action-row">
+              <button
+                className="console-button console-button--primary"
+                type="submit"
+                disabled={busyId === editingComposition.id}
+              >
+                {busyId === editingComposition.id ? "Saving…" : "Save draft"}
+              </button>
+              <button
+                className="console-button console-button--quiet"
+                type="button"
+                onClick={() => setEditingComposition(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </section>
+      ) : null}
       {servers.length === 0 ? (
         <EmptyState
           title="Register an upstream first"
@@ -1112,6 +1848,32 @@ function ComposerArea({
                         <dd>{composition.environmentId}</dd>
                       </div>
                     </dl>
+                    <div className="console-card-actions">
+                      <button
+                        type="button"
+                        onClick={() => beginEdit(composition)}
+                        disabled={busyId === composition.id}
+                      >
+                        Edit members
+                      </button>
+                      {composition.status === "draft" ? (
+                        <button
+                          type="button"
+                          onClick={() => void publish(composition)}
+                          disabled={busyId === composition.id}
+                        >
+                          Publish
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="is-danger"
+                        onClick={() => void remove(composition)}
+                        disabled={busyId === composition.id}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -1168,6 +1930,28 @@ function ComposerArea({
                 />
               </label>
               <label>
+                <span>Environment</span>
+                <select
+                  required
+                  value={form.environmentId}
+                  onChange={(event) =>
+                    setForm({ ...form, environmentId: event.target.value })
+                  }
+                >
+                  {environments.length > 0 ? (
+                    environments.map((environment) => (
+                      <option key={environment.id} value={environment.id}>
+                        {environment.name} · {environment.kind}
+                      </option>
+                    ))
+                  ) : overview ? (
+                    <option value={overview.environment.id}>
+                      {overview.environment.name} · {overview.environment.kind}
+                    </option>
+                  ) : null}
+                </select>
+              </label>
+              <label>
                 <span>First member</span>
                 <select
                   required
@@ -1204,7 +1988,13 @@ function ComposerArea({
               </label>
               <div className="console-form__readout">
                 <span>Environment</span>
-                <strong>{overview?.environment.name ?? "Unavailable"}</strong>
+                <strong>
+                  {environments.find(
+                    (environment) => environment.id === form.environmentId
+                  )?.name ??
+                    overview?.environment.name ??
+                    "Unavailable"}
+                </strong>
               </div>
               <button
                 className="console-button console-button--primary"
@@ -1225,21 +2015,37 @@ function IdentityArea({
   client,
   demoMode,
   overview,
+  environments,
   compositions,
+  sessions,
+  roles,
+  assignments,
   providers,
   onNotice,
+  onChanged,
 }: {
   client: LiteMcpApiClient;
   demoMode: boolean;
   overview: PlatformOverview | null;
+  environments: Environment[];
   compositions: Composition[];
+  sessions: GatewaySession[];
+  roles: Role[];
+  assignments: RoleAssignment[];
   providers: IdentityProvider[];
   onNotice: (notice: Notice | null) => void;
+  onChanged: () => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [issued, setIssued] = useState<IssuedSession | null>(null);
+  const [snippetId, setSnippetId] = useState("cursor");
+  const [issuedPrincipal, setIssuedPrincipal] = useState<IssuedServicePrincipal | null>(
+    null
+  );
   const [form, setForm] = useState({
     compositionId: "",
+    environmentId: "",
     subjectType: "user" as "user" | "service-principal",
     subjectId: "demo-user",
     roles: "developer",
@@ -1247,15 +2053,55 @@ function IdentityArea({
     approvedClients: "codex",
     expiresInSeconds: 3600,
   });
+  const [roleForm, setRoleForm] = useState({
+    id: "",
+    name: "",
+    slug: "",
+    description: "",
+  });
+  const [assignmentForm, setAssignmentForm] = useState({
+    subjectId: "",
+    roleId: "",
+  });
+  const [providerForm, setProviderForm] = useState({
+    id: "",
+    name: "",
+    protocol: "oidc" as "oidc" | "saml",
+    issuer: "",
+    domains: "",
+    clientId: "",
+    clientSecret: "",
+    status: "draft" as "draft" | "active" | "disabled",
+    groupMappings: "[]",
+  });
+  const [principalForm, setPrincipalForm] = useState({ name: "", roles: "" });
 
   useEffect(() => {
     if (!form.compositionId && compositions[0])
       setForm((current) => ({ ...current, compositionId: compositions[0]?.id ?? "" }));
   }, [compositions, form.compositionId]);
 
+  useEffect(() => {
+    if (!form.environmentId && (environments[0] || overview?.environment)) {
+      setForm((current) => ({
+        ...current,
+        environmentId: environments[0]?.id ?? overview?.environment.id ?? "",
+      }));
+    }
+  }, [environments, form.environmentId, overview]);
+
+  useEffect(() => {
+    if (!assignmentForm.roleId && roles[0]) {
+      setAssignmentForm((current) => ({
+        ...current,
+        roleId: roles[0]?.id ?? "",
+      }));
+    }
+  }, [assignmentForm.roleId, roles]);
+
   const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!overview || !form.compositionId) {
+    if (!form.environmentId || !form.compositionId) {
       onNotice({
         tone: "error",
         text: "Create a composition and load the environment before issuing a session.",
@@ -1266,7 +2112,7 @@ function IdentityArea({
     setIssued(null);
     const input: CreateSessionInput = {
       compositionId: form.compositionId,
-      environmentId: overview.environment.id,
+      environmentId: form.environmentId,
       subject: demoMode
         ? {
             type: form.subjectType,
@@ -1288,15 +2134,241 @@ function IdentityArea({
     try {
       const result = await client.issueSession(input);
       setIssued(result.data);
+      setSnippetId("cursor");
       onNotice({
         tone: "success",
         text: "A scoped gateway session was issued. The token is shown once below.",
         requestId: result.meta.requestId,
       });
+      onChanged();
     } catch (cause) {
       onNotice(errorNotice(cause, "Could not issue the session."));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const revokeSession = async (session: GatewaySession) => {
+    if (!confirmAction(`Revoke session ${session.id}? Its token will stop working.`))
+      return;
+    setBusyId(session.id);
+    try {
+      const result = await client.revokeSession(session.id);
+      onNotice({
+        tone: "success",
+        text: `Session ${session.id} was revoked.`,
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onNotice(errorNotice(cause, "Could not revoke the session."));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const saveRole = async (event: SubmitEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusyId(roleForm.id || "new-role");
+    try {
+      const input: CreateRoleInput = {
+        name: roleForm.name.trim(),
+        slug: roleForm.slug.trim() || slugify(roleForm.name),
+        description: roleForm.description.trim(),
+      };
+      const result = roleForm.id
+        ? await client.updateRole(roleForm.id, {
+            name: input.name,
+            description: input.description,
+          })
+        : await client.createRole(input);
+      setRoleForm({ id: "", name: "", slug: "", description: "" });
+      onNotice({
+        tone: "success",
+        text: `${result.data.name} was ${roleForm.id ? "updated" : "created"}.`,
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onNotice(errorNotice(cause, "Could not save the role."));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const deleteRole = async (role: Role) => {
+    if (!confirmAction(`Delete role ${role.name}? Remove its assignments first.`))
+      return;
+    setBusyId(role.id);
+    try {
+      const result = await client.deleteRole(role.id);
+      onNotice({
+        tone: "success",
+        text: `${role.name} was deleted.`,
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onNotice(errorNotice(cause, "Could not delete the role."));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const assignRole = async (event: SubmitEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusyId("new-assignment");
+    try {
+      const result = await client.assignRole({
+        subjectId: assignmentForm.subjectId.trim(),
+        roleId: assignmentForm.roleId,
+      });
+      setAssignmentForm((current) => ({ ...current, subjectId: "" }));
+      onNotice({
+        tone: "success",
+        text: "Role assignment created; existing scoped credentials were invalidated.",
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onNotice(errorNotice(cause, "Could not assign the role."));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const removeAssignment = async (assignment: RoleAssignment) => {
+    if (!confirmAction(`Remove this role assignment from ${assignment.subjectId}?`))
+      return;
+    setBusyId(assignment.id);
+    try {
+      const result = await client.removeRoleAssignment(assignment.id);
+      onNotice({
+        tone: "success",
+        text: "Role assignment removed; existing scoped credentials were invalidated.",
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onNotice(errorNotice(cause, "Could not remove the role assignment."));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const editProvider = (provider: IdentityProvider) => {
+    setProviderForm({
+      id: provider.id,
+      name: provider.name,
+      protocol: provider.protocol,
+      issuer: provider.issuer,
+      domains: provider.domains.join(", "),
+      clientId: provider.clientId,
+      clientSecret: "",
+      status: provider.status,
+      groupMappings: JSON.stringify(provider.groupMappings, null, 2),
+    });
+  };
+
+  const saveProvider = async (event: SubmitEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    let groupMappings: CreateIdentityProviderInput["groupMappings"];
+    try {
+      const parsed = JSON.parse(providerForm.groupMappings) as unknown;
+      if (!Array.isArray(parsed)) throw new Error("Mappings must be a JSON array.");
+      groupMappings = parsed as CreateIdentityProviderInput["groupMappings"];
+    } catch (cause) {
+      onNotice({
+        tone: "error",
+        text:
+          cause instanceof Error ? cause.message : "Group mappings are invalid JSON.",
+      });
+      return;
+    }
+    setBusyId(providerForm.id || "new-provider");
+    const input = {
+      name: providerForm.name.trim(),
+      protocol: providerForm.protocol,
+      issuer: providerForm.issuer.trim(),
+      domains: splitList(providerForm.domains),
+      clientId: providerForm.clientId.trim(),
+      status: providerForm.status,
+      groupMappings,
+      ...(providerForm.clientSecret ? { clientSecret: providerForm.clientSecret } : {}),
+    };
+    try {
+      const result = providerForm.id
+        ? await client.updateIdentityProvider(providerForm.id, input)
+        : await client.createIdentityProvider({
+            ...input,
+            clientSecret: providerForm.clientSecret,
+          });
+      setProviderForm({
+        id: "",
+        name: "",
+        protocol: "oidc",
+        issuer: "",
+        domains: "",
+        clientId: "",
+        clientSecret: "",
+        status: "draft",
+        groupMappings: "[]",
+      });
+      onNotice({
+        tone: "success",
+        text: `${result.data.name} was saved; its client secret is encrypted at rest.`,
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onNotice(errorNotice(cause, "Could not save the identity provider."));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const deleteProvider = async (provider: IdentityProvider) => {
+    if (!confirmAction(`Delete identity provider ${provider.name}?`)) return;
+    setBusyId(provider.id);
+    try {
+      const result = await client.deleteIdentityProvider(provider.id);
+      if (providerForm.id === provider.id) {
+        setProviderForm((current) => ({ ...current, id: "", name: "" }));
+      }
+      onNotice({
+        tone: "success",
+        text: `${provider.name} was deleted; scoped credentials were invalidated.`,
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onNotice(errorNotice(cause, "Could not delete the identity provider."));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const issuePrincipal = async (event: SubmitEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusyId("new-principal");
+    setIssuedPrincipal(null);
+    const input: CreateServicePrincipalInput = {
+      name: principalForm.name.trim(),
+      roles: splitList(principalForm.roles),
+    };
+    try {
+      const result = await client.createServicePrincipal(input);
+      setIssuedPrincipal(result.data);
+      setPrincipalForm({ name: "", roles: "" });
+      onNotice({
+        tone: "success",
+        text: "Service principal created. Copy its secret now; it is shown once.",
+        requestId: result.meta.requestId,
+      });
+    } catch (cause) {
+      onNotice(errorNotice(cause, "Could not create the service principal."));
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -1336,6 +2408,28 @@ function IdentityArea({
                       {composition.name} · {composition.status}
                     </option>
                   ))}
+                </select>
+              </label>
+              <label>
+                <span>Environment</span>
+                <select
+                  required
+                  value={form.environmentId}
+                  onChange={(event) =>
+                    setForm({ ...form, environmentId: event.target.value })
+                  }
+                >
+                  {environments.length > 0 ? (
+                    environments.map((environment) => (
+                      <option key={environment.id} value={environment.id}>
+                        {environment.name} · {environment.kind}
+                      </option>
+                    ))
+                  ) : overview ? (
+                    <option value={overview.environment.id}>
+                      {overview.environment.name} · {overview.environment.kind}
+                    </option>
+                  ) : null}
                 </select>
               </label>
               {demoMode ? (
@@ -1459,6 +2553,30 @@ function IdentityArea({
                 <span>Bearer token</span>
                 <textarea readOnly value={issued.token} />
               </label>
+              <div className="console-action-row">
+                <button
+                  className="console-button"
+                  type="button"
+                  onClick={() =>
+                    void copyText(issued.token)
+                      .then(() =>
+                        onNotice({ tone: "info", text: "Bearer token copied." })
+                      )
+                      .catch((cause) =>
+                        onNotice(errorNotice(cause, "Could not copy the token."))
+                      )
+                  }
+                >
+                  Copy token
+                </button>
+                <button
+                  className="console-button console-button--quiet"
+                  type="button"
+                  onClick={() => setIssued(null)}
+                >
+                  Hide credential
+                </button>
+              </div>
               <dl className="console-definition-list">
                 <div>
                   <dt>Session</dt>
@@ -1469,6 +2587,61 @@ function IdentityArea({
                   <dd>{displayDate(issued.session.expiresAt)}</dd>
                 </div>
               </dl>
+              <div className="console-snippets">
+                <div className="console-tabs" role="tablist" aria-label="Client setup">
+                  {sessionSetupSnippets(issued).map((snippet) => (
+                    <button
+                      key={snippet.id}
+                      id={`snippet-tab-${snippet.id}`}
+                      type="button"
+                      role="tab"
+                      aria-selected={snippetId === snippet.id}
+                      aria-controls={`snippet-panel-${snippet.id}`}
+                      className={snippetId === snippet.id ? "is-active" : undefined}
+                      onClick={() => setSnippetId(snippet.id)}
+                    >
+                      {snippet.label}
+                    </button>
+                  ))}
+                </div>
+                {sessionSetupSnippets(issued)
+                  .filter((snippet) => snippet.id === snippetId)
+                  .map((snippet) => (
+                    <div
+                      key={snippet.id}
+                      id={`snippet-panel-${snippet.id}`}
+                      role="tabpanel"
+                      aria-labelledby={`snippet-tab-${snippet.id}`}
+                    >
+                      <div className="console-snippets__heading">
+                        <span>{snippet.location}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void copyText(snippet.value)
+                              .then(() =>
+                                onNotice({
+                                  tone: "info",
+                                  text: `${snippet.label} setup copied.`,
+                                })
+                              )
+                              .catch((cause) =>
+                                onNotice(
+                                  errorNotice(
+                                    cause,
+                                    "Could not copy the setup snippet."
+                                  )
+                                )
+                              )
+                          }
+                        >
+                          Copy config
+                        </button>
+                      </div>
+                      <pre>{snippet.value}</pre>
+                    </div>
+                  ))}
+              </div>
             </div>
           ) : (
             <EmptyState
@@ -1479,53 +2652,642 @@ function IdentityArea({
         </section>
       </div>
 
-      <section className="console-panel">
+      <section className="console-panel console-panel--table">
         <header className="console-panel__header">
           <div>
-            <span>Federation</span>
-            <h2>{providers.length} enterprise identity providers</h2>
+            <span>Session inventory</span>
+            <h2>{sessions.length} scoped sessions</h2>
           </div>
         </header>
-        {providers.length > 0 ? (
+        {sessions.length > 0 ? (
           <div className="console-table-wrap">
             <table className="console-table">
-              <caption className="sr-only">Enterprise identity providers</caption>
+              <caption className="sr-only">Scoped gateway sessions</caption>
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Protocol</th>
-                  <th>Verified domains</th>
-                  <th>Group mappings</th>
+                  <th>Subject</th>
+                  <th>Composition</th>
+                  <th>Clients</th>
+                  <th>Expires</th>
                   <th>Status</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {providers.map((provider) => (
-                  <tr key={provider.id}>
-                    <td>
-                      <strong>{provider.name}</strong>
-                      <small>{provider.issuer}</small>
-                    </td>
-                    <td>
-                      <code>{provider.protocol.toUpperCase()}</code>
-                    </td>
-                    <td>{provider.domains.join(", ")}</td>
-                    <td>{provider.groupMappings.length}</td>
-                    <td>
-                      <StatusBadge value={provider.status} />
-                    </td>
-                  </tr>
-                ))}
+                {sessions.map((session) => {
+                  const expired = new Date(session.expiresAt).getTime() <= Date.now();
+                  const status = session.revokedAt
+                    ? "revoked"
+                    : expired
+                      ? "expired"
+                      : "active";
+                  return (
+                    <tr key={session.id}>
+                      <td>
+                        <strong>{session.subject.id}</strong>
+                        <small>{session.subject.type}</small>
+                      </td>
+                      <td>
+                        <code>{session.compositionId}</code>
+                        <small>{session.environmentId}</small>
+                      </td>
+                      <td>{session.approvedClients.join(", ") || "—"}</td>
+                      <td>{displayDate(session.expiresAt)}</td>
+                      <td>
+                        <StatusBadge value={status} />
+                      </td>
+                      <td>
+                        {!session.revokedAt && !expired ? (
+                          <div className="console-row-actions">
+                            <button
+                              type="button"
+                              className="is-danger"
+                              onClick={() => void revokeSession(session)}
+                              disabled={busyId === session.id}
+                            >
+                              {busyId === session.id ? "Revoking…" : "Revoke"}
+                            </button>
+                          </div>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         ) : (
           <EmptyState
-            title="No identity providers configured"
-            description="OIDC and SAML provider registrations will appear here after an organization owner configures federation."
+            title="No sessions yet"
+            description="Issue a short-lived credential above to connect an MCP client."
           />
         )}
       </section>
+
+      <div className="console-split console-split--form">
+        <section className="console-panel console-panel--table">
+          <header className="console-panel__header">
+            <div>
+              <span>Platform RBAC</span>
+              <h2>{roles.length} roles</h2>
+            </div>
+          </header>
+          {roles.length > 0 ? (
+            <div className="console-table-wrap">
+              <table className="console-table">
+                <caption className="sr-only">Platform roles</caption>
+                <thead>
+                  <tr>
+                    <th>Role</th>
+                    <th>Type</th>
+                    <th>Assignments</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {roles.map((role) => (
+                    <tr key={role.id}>
+                      <td>
+                        <strong>{role.name}</strong>
+                        <small>
+                          {role.slug} · {role.description}
+                        </small>
+                      </td>
+                      <td>{role.builtin ? "Built in" : "Custom"}</td>
+                      <td>
+                        {
+                          assignments.filter(
+                            (assignment) => assignment.roleId === role.id
+                          ).length
+                        }
+                      </td>
+                      <td>
+                        <div className="console-row-actions">
+                          {!role.builtin ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setRoleForm({
+                                    id: role.id,
+                                    name: role.name,
+                                    slug: role.slug,
+                                    description: role.description,
+                                  })
+                                }
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="is-danger"
+                                disabled={busyId === role.id}
+                                onClick={() => void deleteRole(role)}
+                              >
+                                Delete
+                              </button>
+                            </>
+                          ) : (
+                            <span>Protected</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              title="No roles returned"
+              description="Bootstrap the organization before assigning access."
+            />
+          )}
+
+          <header className="console-panel__header console-panel__subheader">
+            <div>
+              <span>Assignments</span>
+              <h2>{assignments.length} subject bindings</h2>
+            </div>
+          </header>
+          {assignments.length > 0 ? (
+            <div className="console-table-wrap">
+              <table className="console-table">
+                <caption className="sr-only">Role assignments</caption>
+                <thead>
+                  <tr>
+                    <th>Subject</th>
+                    <th>Role</th>
+                    <th>Created</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {assignments.map((assignment) => (
+                    <tr key={assignment.id}>
+                      <td>
+                        <strong>{assignment.subjectId}</strong>
+                      </td>
+                      <td>
+                        {roles.find((role) => role.id === assignment.roleId)?.name ??
+                          assignment.roleId}
+                      </td>
+                      <td>{displayDate(assignment.createdAt)}</td>
+                      <td>
+                        <div className="console-row-actions">
+                          <button
+                            type="button"
+                            className="is-danger"
+                            disabled={busyId === assignment.id}
+                            onClick={() => void removeAssignment(assignment)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </section>
+
+        <section className="console-panel console-panel--sticky">
+          <header className="console-panel__header">
+            <div>
+              <span>{roleForm.id ? "Edit" : "Create"}</span>
+              <h2>{roleForm.id ? "Update role" : "Custom role"}</h2>
+            </div>
+            {roleForm.id ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setRoleForm({ id: "", name: "", slug: "", description: "" })
+                }
+              >
+                Cancel
+              </button>
+            ) : null}
+          </header>
+          <form className="console-form" onSubmit={saveRole}>
+            <label>
+              <span>Name</span>
+              <input
+                required
+                minLength={2}
+                value={roleForm.name}
+                onChange={(event) =>
+                  setRoleForm({
+                    ...roleForm,
+                    name: event.target.value,
+                    slug: roleForm.slug || slugify(event.target.value),
+                  })
+                }
+              />
+            </label>
+            <label>
+              <span>Slug</span>
+              <input
+                required
+                disabled={Boolean(roleForm.id)}
+                value={roleForm.slug}
+                onChange={(event) =>
+                  setRoleForm({ ...roleForm, slug: slugify(event.target.value) })
+                }
+              />
+            </label>
+            <label>
+              <span>Description</span>
+              <textarea
+                value={roleForm.description}
+                onChange={(event) =>
+                  setRoleForm({ ...roleForm, description: event.target.value })
+                }
+              />
+            </label>
+            <button
+              className="console-button console-button--primary"
+              type="submit"
+              disabled={busyId === (roleForm.id || "new-role")}
+            >
+              {roleForm.id ? "Save role" : "Create role"}
+            </button>
+          </form>
+          <header className="console-panel__header console-panel__subheader">
+            <div>
+              <span>Bind access</span>
+              <h2>Assign role</h2>
+            </div>
+          </header>
+          <form className="console-form" onSubmit={assignRole}>
+            <label>
+              <span>Subject ID</span>
+              <input
+                required
+                minLength={3}
+                value={assignmentForm.subjectId}
+                onChange={(event) =>
+                  setAssignmentForm({
+                    ...assignmentForm,
+                    subjectId: event.target.value,
+                  })
+                }
+                placeholder="user_123"
+              />
+            </label>
+            <label>
+              <span>Role</span>
+              <select
+                required
+                value={assignmentForm.roleId}
+                onChange={(event) =>
+                  setAssignmentForm({
+                    ...assignmentForm,
+                    roleId: event.target.value,
+                  })
+                }
+              >
+                {roles.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {role.name} · {role.slug}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              className="console-button console-button--primary"
+              type="submit"
+              disabled={busyId === "new-assignment" || roles.length === 0}
+            >
+              Assign role
+            </button>
+          </form>
+        </section>
+      </div>
+
+      <div className="console-split console-split--form">
+        <section className="console-panel console-panel--table">
+          <header className="console-panel__header">
+            <div>
+              <span>Federation</span>
+              <h2>{providers.length} enterprise identity providers</h2>
+            </div>
+          </header>
+          {providers.length > 0 ? (
+            <div className="console-table-wrap">
+              <table className="console-table">
+                <caption className="sr-only">Enterprise identity providers</caption>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Protocol</th>
+                    <th>Domains</th>
+                    <th>Mappings</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {providers.map((provider) => (
+                    <tr key={provider.id}>
+                      <td>
+                        <strong>{provider.name}</strong>
+                        <small>{provider.issuer}</small>
+                      </td>
+                      <td>
+                        <code>{provider.protocol.toUpperCase()}</code>
+                      </td>
+                      <td>{provider.domains.join(", ")}</td>
+                      <td>{provider.groupMappings.length}</td>
+                      <td>
+                        <StatusBadge value={provider.status} />
+                      </td>
+                      <td>
+                        <div className="console-row-actions">
+                          <button type="button" onClick={() => editProvider(provider)}>
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="is-danger"
+                            disabled={busyId === provider.id}
+                            onClick={() => void deleteProvider(provider)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              title="No identity providers configured"
+              description="Add an encrypted OIDC or SAML registration from the form."
+            />
+          )}
+        </section>
+
+        <section className="console-panel console-panel--sticky">
+          <header className="console-panel__header">
+            <div>
+              <span>{providerForm.id ? "Edit" : "Create"}</span>
+              <h2>Encrypted identity provider</h2>
+            </div>
+            {providerForm.id ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setProviderForm({
+                    id: "",
+                    name: "",
+                    protocol: "oidc",
+                    issuer: "",
+                    domains: "",
+                    clientId: "",
+                    clientSecret: "",
+                    status: "draft",
+                    groupMappings: "[]",
+                  })
+                }
+              >
+                Cancel
+              </button>
+            ) : null}
+          </header>
+          <form className="console-form" onSubmit={saveProvider}>
+            <div className="console-form__row">
+              <label>
+                <span>Name</span>
+                <input
+                  required
+                  minLength={2}
+                  value={providerForm.name}
+                  onChange={(event) =>
+                    setProviderForm({ ...providerForm, name: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                <span>Protocol</span>
+                <select
+                  value={providerForm.protocol}
+                  onChange={(event) =>
+                    setProviderForm({
+                      ...providerForm,
+                      protocol: event.target.value as typeof providerForm.protocol,
+                    })
+                  }
+                >
+                  <option value="oidc">OIDC</option>
+                  <option value="saml">SAML</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              <span>Issuer URL</span>
+              <input
+                required
+                type="url"
+                value={providerForm.issuer}
+                onChange={(event) =>
+                  setProviderForm({ ...providerForm, issuer: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              <span>Verified domains</span>
+              <input
+                required
+                value={providerForm.domains}
+                onChange={(event) =>
+                  setProviderForm({ ...providerForm, domains: event.target.value })
+                }
+                placeholder="example.com, eu.example.com"
+              />
+            </label>
+            <label>
+              <span>Client ID</span>
+              <input
+                required
+                value={providerForm.clientId}
+                onChange={(event) =>
+                  setProviderForm({ ...providerForm, clientId: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              <span>
+                {providerForm.id ? "New client secret (optional)" : "Client secret"}
+              </span>
+              <input
+                required={!providerForm.id}
+                minLength={16}
+                type="password"
+                autoComplete="new-password"
+                value={providerForm.clientSecret}
+                onChange={(event) =>
+                  setProviderForm({
+                    ...providerForm,
+                    clientSecret: event.target.value,
+                  })
+                }
+              />
+              <small>
+                Sent once over TLS and stored with the configured credential cipher.
+              </small>
+            </label>
+            <div className="console-form__row">
+              <label>
+                <span>Status</span>
+                <select
+                  value={providerForm.status}
+                  onChange={(event) =>
+                    setProviderForm({
+                      ...providerForm,
+                      status: event.target.value as typeof providerForm.status,
+                    })
+                  }
+                >
+                  <option value="draft">Draft</option>
+                  <option value="active">Active</option>
+                  <option value="disabled">Disabled</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              <span>Group mappings (JSON)</span>
+              <textarea
+                className="console-code-input"
+                value={providerForm.groupMappings}
+                onChange={(event) =>
+                  setProviderForm({
+                    ...providerForm,
+                    groupMappings: event.target.value,
+                  })
+                }
+                spellCheck={false}
+              />
+              <small>Array entries use claim, value, and an existing role slug.</small>
+            </label>
+            <button
+              className="console-button console-button--primary"
+              type="submit"
+              disabled={busyId === (providerForm.id || "new-provider")}
+            >
+              {providerForm.id ? "Save provider" : "Create provider"}
+            </button>
+          </form>
+        </section>
+      </div>
+
+      <div className="console-split">
+        <section className="console-panel">
+          <header className="console-panel__header">
+            <div>
+              <span>Machine identity</span>
+              <h2>Create service principal</h2>
+            </div>
+          </header>
+          <form className="console-form" onSubmit={issuePrincipal}>
+            <label>
+              <span>Name</span>
+              <input
+                required
+                minLength={2}
+                value={principalForm.name}
+                onChange={(event) =>
+                  setPrincipalForm({ ...principalForm, name: event.target.value })
+                }
+                placeholder="CI deployment agent"
+              />
+            </label>
+            <label>
+              <span>Role slugs</span>
+              <input
+                value={principalForm.roles}
+                onChange={(event) =>
+                  setPrincipalForm({ ...principalForm, roles: event.target.value })
+                }
+                placeholder={roles
+                  .map((role) => role.slug)
+                  .slice(0, 3)
+                  .join(", ")}
+              />
+            </label>
+            <button
+              className="console-button console-button--primary"
+              type="submit"
+              disabled={busyId === "new-principal"}
+            >
+              {busyId === "new-principal" ? "Creating…" : "Create principal"}
+            </button>
+          </form>
+        </section>
+        <section className="console-panel console-panel--token">
+          <header className="console-panel__header">
+            <div>
+              <span>One-time secret</span>
+              <h2>Service-principal credentials</h2>
+            </div>
+          </header>
+          {issuedPrincipal ? (
+            <div className="console-token" aria-live="polite">
+              <div className="console-token__warning">
+                <strong>Copy this secret now.</strong>
+                <span>Only its hash is retained by LiteMCP.</span>
+              </div>
+              <label>
+                <span>Client ID</span>
+                <input readOnly value={issuedPrincipal.principal.clientId} />
+              </label>
+              <label>
+                <span>Client secret</span>
+                <textarea readOnly value={issuedPrincipal.secret} />
+              </label>
+              <div className="console-action-row">
+                <button
+                  className="console-button"
+                  type="button"
+                  onClick={() =>
+                    void copyText(
+                      `${issuedPrincipal.principal.clientId}:${issuedPrincipal.secret}`
+                    )
+                      .then(() =>
+                        onNotice({
+                          tone: "info",
+                          text: "Service-principal credentials copied.",
+                        })
+                      )
+                      .catch((cause) =>
+                        onNotice(errorNotice(cause, "Could not copy the credentials."))
+                      )
+                  }
+                >
+                  Copy client ID + secret
+                </button>
+                <button
+                  className="console-button console-button--quiet"
+                  type="button"
+                  onClick={() => setIssuedPrincipal(null)}
+                >
+                  Hide secret
+                </button>
+              </div>
+            </div>
+          ) : (
+            <EmptyState
+              title="No service-principal secret shown"
+              description="Create a machine identity to reveal its secret once."
+            />
+          )}
+        </section>
+      </div>
     </section>
   );
 }
@@ -1534,13 +3296,24 @@ function PolicyArea({
   client,
   policies,
   onNotice,
+  onChanged,
 }: {
   client: LiteMcpApiClient;
   policies: Policy[];
   onNotice: (notice: Notice | null) => void;
+  onChanged: () => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [policyBusy, setPolicyBusy] = useState<string | null>(null);
   const [decision, setDecision] = useState<PolicyDecision | null>(null);
+  const [lintByPolicy, setLintByPolicy] = useState<Record<string, PolicyLint>>({});
+  const [policyForm, setPolicyForm] = useState({
+    id: "",
+    name: "",
+    description: "",
+    defaultEffect: "deny" as "allow" | "deny",
+    rules: "[]",
+  });
   const [form, setForm] = useState({
     policyId: "",
     subjectType: "user" as "user" | "service-principal",
@@ -1551,6 +3324,136 @@ function PolicyArea({
     toolName: "docs.search",
     risk: "read" as RiskClass,
   });
+
+  const resetPolicyForm = () =>
+    setPolicyForm({
+      id: "",
+      name: "",
+      description: "",
+      defaultEffect: "deny",
+      rules: "[]",
+    });
+
+  const editPolicy = (policy: Policy) => {
+    setPolicyForm({
+      id: policy.id,
+      name: policy.name,
+      description: policy.description,
+      defaultEffect: policy.defaultEffect,
+      rules: JSON.stringify(policy.rules, null, 2),
+    });
+  };
+
+  const savePolicy = async (event: SubmitEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    let rules: PolicyRule[];
+    try {
+      const parsed = JSON.parse(policyForm.rules) as unknown;
+      if (!Array.isArray(parsed)) throw new Error("Policy rules must be a JSON array.");
+      rules = parsed as PolicyRule[];
+    } catch (cause) {
+      onNotice({
+        tone: "error",
+        text: cause instanceof Error ? cause.message : "Policy rules are invalid JSON.",
+      });
+      return;
+    }
+    setPolicyBusy(policyForm.id || "new-policy");
+    const input: CreatePolicyInput = {
+      name: policyForm.name.trim(),
+      description: policyForm.description.trim(),
+      defaultEffect: policyForm.defaultEffect,
+      rules,
+    };
+    try {
+      const result = policyForm.id
+        ? await client.updatePolicy(policyForm.id, input)
+        : await client.createPolicy(input);
+      setLintByPolicy((current) => ({
+        ...current,
+        [result.data.policy.id]: result.data.lint,
+      }));
+      onNotice({
+        tone: result.data.lint.valid ? "success" : "info",
+        text: `${result.data.policy.name} was saved as a draft. ${
+          result.data.lint.valid
+            ? "Lint passed."
+            : "Resolve lint conflicts before activation."
+        }`,
+        requestId: result.meta.requestId,
+      });
+      resetPolicyForm();
+      onChanged();
+    } catch (cause) {
+      onNotice(errorNotice(cause, "Could not save the policy."));
+    } finally {
+      setPolicyBusy(null);
+    }
+  };
+
+  const lintPolicy = async (policy: Policy) => {
+    setPolicyBusy(policy.id);
+    try {
+      const result = await client.lintPolicy(policy.id);
+      setLintByPolicy((current) => ({ ...current, [policy.id]: result.data }));
+      onNotice({
+        tone: result.data.valid ? "success" : "info",
+        text: result.data.valid
+          ? `${policy.name} passed lint.`
+          : `${policy.name} has ${result.data.conflicts.length} blocking conflict(s).`,
+        requestId: result.meta.requestId,
+      });
+    } catch (cause) {
+      onNotice(errorNotice(cause, "Could not lint the policy."));
+    } finally {
+      setPolicyBusy(null);
+    }
+  };
+
+  const activatePolicy = async (policy: Policy) => {
+    if (
+      !confirmAction(
+        `Activate ${policy.name}? The previous active policy is archived and existing MCP sessions are invalidated.`
+      )
+    )
+      return;
+    setPolicyBusy(policy.id);
+    try {
+      const result = await client.activatePolicy(policy.id);
+      setLintByPolicy((current) => ({
+        ...current,
+        [policy.id]: result.data.lint,
+      }));
+      onNotice({
+        tone: "success",
+        text: `${result.data.policy.name} is active. Existing scoped credentials were invalidated.`,
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onNotice(errorNotice(cause, "Could not activate the policy."));
+    } finally {
+      setPolicyBusy(null);
+    }
+  };
+
+  const archivePolicy = async (policy: Policy) => {
+    if (!confirmAction(`Archive ${policy.name}?`)) return;
+    setPolicyBusy(policy.id);
+    try {
+      const result = await client.archivePolicy(policy.id);
+      onNotice({
+        tone: "success",
+        text: `${result.data.name} was archived.`,
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onNotice(errorNotice(cause, "Could not archive the policy."));
+    } finally {
+      setPolicyBusy(null);
+    }
+  };
 
   const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1588,9 +3491,214 @@ function PolicyArea({
     <section className="console-area">
       <AreaHeading
         eyebrow="Decision plane"
-        title="Policy simulator"
-        description="Evaluate a real subject, action, tool, and risk class against the active or selected policy."
+        title="Policies & simulator"
+        description="Author, lint, activate, and test default-deny rules before they govern live discovery and execution."
       />
+      <div className="console-split console-split--form">
+        <section className="console-panel console-panel--table">
+          <header className="console-panel__header">
+            <div>
+              <span>Lifecycle</span>
+              <h2>{policies.length} versioned policies</h2>
+            </div>
+          </header>
+          {policies.length > 0 ? (
+            <div className="console-table-wrap">
+              <table className="console-table">
+                <caption className="sr-only">Policy lifecycle</caption>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Default</th>
+                    <th>Rules</th>
+                    <th>Status</th>
+                    <th>Lint</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {policies.map((policy) => {
+                    const lint = lintByPolicy[policy.id];
+                    return (
+                      <tr key={policy.id}>
+                        <td>
+                          <strong>{policy.name}</strong>
+                          <small>
+                            {policy.version} · {policy.description}
+                          </small>
+                        </td>
+                        <td>{policy.defaultEffect}</td>
+                        <td>{policy.rules.length}</td>
+                        <td>
+                          <StatusBadge value={policy.status} />
+                        </td>
+                        <td>
+                          {lint ? (
+                            <StatusBadge value={lint.valid ? "valid" : "conflicts"} />
+                          ) : (
+                            "Not run"
+                          )}
+                          {lint &&
+                          (lint.conflicts.length || lint.unreachable.length) ? (
+                            <small>
+                              {lint.conflicts.length} conflicts ·{" "}
+                              {lint.unreachable.length} unreachable
+                            </small>
+                          ) : null}
+                        </td>
+                        <td>
+                          <div className="console-row-actions">
+                            <button
+                              type="button"
+                              onClick={() => void lintPolicy(policy)}
+                              disabled={policyBusy === policy.id}
+                            >
+                              Lint
+                            </button>
+                            {policy.status !== "active" ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => editPolicy(policy)}
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void activatePolicy(policy)}
+                                  disabled={policyBusy === policy.id}
+                                >
+                                  Activate
+                                </button>
+                              </>
+                            ) : null}
+                            {policy.status === "draft" ? (
+                              <button
+                                type="button"
+                                className="is-danger"
+                                onClick={() => void archivePolicy(policy)}
+                                disabled={policyBusy === policy.id}
+                              >
+                                Archive
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              title="No policy exists"
+              description="Create a default-deny draft, lint it, then activate it."
+            />
+          )}
+          {Object.entries(lintByPolicy).some(
+            ([, lint]) => lint.conflicts.length > 0 || lint.unreachable.length > 0
+          ) ? (
+            <div className="console-lint-results" aria-live="polite">
+              {Object.entries(lintByPolicy).map(([policyId, lint]) => {
+                const messages = [
+                  ...lint.conflicts.map((item) => item.message),
+                  ...lint.unreachable.map((item) => item.message),
+                ];
+                if (messages.length === 0) return null;
+                return (
+                  <div key={policyId}>
+                    <strong>
+                      {policies.find((policy) => policy.id === policyId)?.name ??
+                        policyId}
+                    </strong>
+                    <ul>
+                      {messages.map((message, index) => (
+                        <li key={`${message}-${index}`}>{message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+        </section>
+        <section className="console-panel console-panel--sticky">
+          <header className="console-panel__header">
+            <div>
+              <span>{policyForm.id ? "Edit draft" : "Create"}</span>
+              <h2>{policyForm.id ? "Policy editor" : "New policy"}</h2>
+            </div>
+            {policyForm.id ? (
+              <button type="button" onClick={resetPolicyForm}>
+                Cancel
+              </button>
+            ) : null}
+          </header>
+          <form className="console-form" onSubmit={savePolicy}>
+            <label>
+              <span>Name</span>
+              <input
+                required
+                minLength={2}
+                value={policyForm.name}
+                onChange={(event) =>
+                  setPolicyForm({ ...policyForm, name: event.target.value })
+                }
+                placeholder="Engineering access"
+              />
+            </label>
+            <label>
+              <span>Description</span>
+              <textarea
+                value={policyForm.description}
+                onChange={(event) =>
+                  setPolicyForm({ ...policyForm, description: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              <span>Default effect</span>
+              <select
+                value={policyForm.defaultEffect}
+                onChange={(event) =>
+                  setPolicyForm({
+                    ...policyForm,
+                    defaultEffect: event.target
+                      .value as typeof policyForm.defaultEffect,
+                  })
+                }
+              >
+                <option value="deny">Deny</option>
+                <option value="allow">Allow</option>
+              </select>
+            </label>
+            <label>
+              <span>Rules (JSON)</span>
+              <textarea
+                className="console-code-input console-code-input--tall"
+                required
+                value={policyForm.rules}
+                onChange={(event) =>
+                  setPolicyForm({ ...policyForm, rules: event.target.value })
+                }
+                spellCheck={false}
+              />
+              <small>
+                Each rule needs id, description, priority, effect, and optional roles,
+                groups, tools, risks, or actions selectors.
+              </small>
+            </label>
+            <button
+              className="console-button console-button--primary"
+              type="submit"
+              disabled={policyBusy === (policyForm.id || "new-policy")}
+            >
+              {policyForm.id ? "Save draft" : "Create draft"}
+            </button>
+          </form>
+        </section>
+      </div>
       <div className="console-split">
         <section className="console-panel">
           <header className="console-panel__header">
@@ -1768,65 +3876,63 @@ function PolicyArea({
           )}
         </section>
       </div>
-
-      <section className="console-panel">
-        <header className="console-panel__header">
-          <div>
-            <span>Inventory</span>
-            <h2>{policies.length} policies</h2>
-          </div>
-        </header>
-        {policies.length > 0 ? (
-          <div className="console-table-wrap">
-            <table className="console-table">
-              <caption className="sr-only">Policies</caption>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Version</th>
-                  <th>Default</th>
-                  <th>Rules</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {policies.map((policy) => (
-                  <tr key={policy.id}>
-                    <td>
-                      <strong>{policy.name}</strong>
-                      <small>{policy.description}</small>
-                    </td>
-                    <td>{policy.version}</td>
-                    <td>{policy.defaultEffect}</td>
-                    <td>{policy.rules.length}</td>
-                    <td>
-                      <StatusBadge value={policy.status} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <EmptyState
-            title="No policies returned"
-            description="The active default policy can still be simulated when the API provides one."
-          />
-        )}
-      </section>
     </section>
   );
 }
 
 function ApprovalsArea({
+  client,
   approvals,
   events,
   pendingCount,
+  onNotice,
+  onChanged,
 }: {
+  client: LiteMcpApiClient;
   approvals: ApprovalRequest[];
   events: AuditEvent[];
   pendingCount: number;
+  onNotice: (notice: Notice | null) => void;
+  onChanged: () => void;
 }) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [reasons, setReasons] = useState<Record<string, string>>({});
+
+  const decide = async (
+    approval: ApprovalRequest,
+    decision: ApprovalDecisionInput["decision"]
+  ) => {
+    const reason = reasons[approval.id]?.trim() ?? "";
+    if (reason.length < 2) {
+      onNotice({
+        tone: "error",
+        text: "Enter a decision reason with at least two characters.",
+      });
+      return;
+    }
+    setBusyId(approval.id);
+    try {
+      const result = await client.decideApproval(approval.id, {
+        decision,
+        reason,
+        generation: approval.generation,
+        fingerprint: approval.fingerprint,
+      });
+      setReasons((current) => ({ ...current, [approval.id]: "" }));
+      onNotice({
+        tone: "success",
+        text: `${result.data.toolName} was ${result.data.status}.`,
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onNotice(errorNotice(cause, "Could not decide the approval request."));
+      if (cause instanceof ApiClientError && cause.status === 409) onChanged();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <section className="console-area">
       <AreaHeading
@@ -1853,6 +3959,7 @@ function ApprovalsArea({
                   <th>Arguments hash</th>
                   <th>Expires</th>
                   <th>Status</th>
+                  <th>Decision</th>
                 </tr>
               </thead>
               <tbody>
@@ -1871,6 +3978,53 @@ function ApprovalsArea({
                     <td>{displayDate(approval.expiresAt)}</td>
                     <td>
                       <StatusBadge value={approval.status} />
+                    </td>
+                    <td>
+                      {approval.status === "pending" ? (
+                        <div className="console-approval-actions">
+                          <label>
+                            <span className="sr-only">
+                              Decision reason for {approval.toolName}
+                            </span>
+                            <input
+                              required
+                              minLength={2}
+                              maxLength={1000}
+                              value={reasons[approval.id] ?? ""}
+                              onChange={(event) =>
+                                setReasons({
+                                  ...reasons,
+                                  [approval.id]: event.target.value,
+                                })
+                              }
+                              placeholder="Reason required"
+                            />
+                          </label>
+                          <div className="console-row-actions">
+                            <button
+                              type="button"
+                              disabled={busyId === approval.id}
+                              onClick={() => void decide(approval, "approved")}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              className="is-danger"
+                              disabled={busyId === approval.id}
+                              onClick={() => void decide(approval, "denied")}
+                            >
+                              Deny
+                            </button>
+                          </div>
+                        </div>
+                      ) : approval.decisionReason ? (
+                        <span title={approval.decisionReason}>
+                          {approval.decisionReason}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -1897,82 +4051,127 @@ function ApprovalsArea({
         />
       </section>
       <div className="console-inline-note">
-        Approval decision mutations are intentionally unavailable until the API exposes
-        a dedicated, request-bound approve/deny endpoint. The console does not fake that
-        action locally.
+        Decisions are bound to the exact tool and arguments hash. Arguments remain
+        encrypted and are never rendered in the inbox.
       </div>
-    </section>
-  );
-}
-
-function ObservabilityArea({
-  overview,
-  events,
-}: {
-  overview: PlatformOverview | null;
-  events: AuditEvent[];
-}) {
-  const outcomes = events.reduce<Record<string, number>>((counts, event) => {
-    counts[event.outcome] = (counts[event.outcome] ?? 0) + 1;
-    return counts;
-  }, {});
-  return (
-    <section className="console-area">
-      <AreaHeading
-        eyebrow="Evidence plane"
-        title="Observability"
-        description="Request-correlated gateway status and append-only audit metadata from the control plane."
-        actions={overview ? <StatusBadge value={overview.gateway.status} /> : null}
-      />
-      <div className="console-observability-strip">
-        <div>
-          <span>Audit events</span>
-          <strong>{events.length}</strong>
-        </div>
-        <div>
-          <span>Succeeded</span>
-          <strong>{outcomes.succeeded ?? 0}</strong>
-        </div>
-        <div>
-          <span>Denied</span>
-          <strong>{outcomes.denied ?? 0}</strong>
-        </div>
-        <div>
-          <span>Failed</span>
-          <strong>{outcomes.failed ?? 0}</strong>
-        </div>
-        <div>
-          <span>Gateway</span>
-          <strong>{overview?.gateway.status ?? "unknown"}</strong>
-        </div>
-      </div>
-      <section className="console-panel">
-        <header className="console-panel__header">
-          <div>
-            <span>Audit ledger</span>
-            <h2>Recent events</h2>
-          </div>
-          <span className="console-hash-label">tamper-evident chain</span>
-        </header>
-        <AuditTable
-          events={events}
-          emptyDescription="No audit events were returned for this tenant."
-          showHash
-        />
-      </section>
     </section>
   );
 }
 
 function SettingsArea({
+  client,
   overview,
+  environments,
   apiBaseUrl,
   demoMode,
+  authority,
+  onAuthority,
+  onNotice,
+  onChanged,
 }: {
+  client: LiteMcpApiClient;
   overview: PlatformOverview | null;
+  environments: Environment[];
   apiBaseUrl: string;
   demoMode: boolean;
+  authority: TenantAuthority | null;
+  onAuthority: (authority: TenantAuthority) => void;
+  onNotice: (notice: Notice | null) => void;
+  onChanged: () => void;
 }) {
+  const [busy, setBusy] = useState<"export" | "import" | "freeze" | null>(null);
+  const [freezeReason, setFreezeReason] = useState("");
+  const [portableJson, setPortableJson] = useState("");
+
+  const exportTenant = async () => {
+    setBusy("export");
+    try {
+      const result = await client.exportTenant();
+      const stamp = result.data.exportedAt.slice(0, 10);
+      downloadJson(
+        `${result.data.organization.slug}-${stamp}.litemcp.json`,
+        result.data
+      );
+      onNotice({
+        tone: "success",
+        text: "A secret-free portable configuration was downloaded.",
+        requestId: result.meta.requestId,
+      });
+    } catch (cause) {
+      onNotice(errorNotice(cause, "Could not export the tenant."));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const importTenant = async (event: SubmitEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    let value: unknown;
+    try {
+      value = JSON.parse(portableJson);
+    } catch {
+      onNotice({ tone: "error", text: "Portable import must be valid JSON." });
+      return;
+    }
+    if (
+      !confirmAction(
+        "Import this configuration? Import is accepted only for a pristine workspace and replaces bootstrap data."
+      )
+    )
+      return;
+    setBusy("import");
+    try {
+      const result = await client.importTenant(value);
+      setPortableJson("");
+      onNotice({
+        tone: "success",
+        text: `${result.data.organization.name} was imported. Configure fresh identity-provider secrets before use.`,
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onNotice(errorNotice(cause, "Could not import the portable configuration."));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const toggleFreeze = async () => {
+    if (authority?.frozen) {
+      if (!confirmAction("Unfreeze this workspace and allow governed access again?"))
+        return;
+    } else if (freezeReason.trim().length < 2) {
+      onNotice({ tone: "error", text: "Enter a freeze reason." });
+      return;
+    } else if (
+      !confirmAction(
+        "Freeze this workspace? All governed MCP access will be denied and existing credentials invalidated."
+      )
+    ) {
+      return;
+    }
+    setBusy("freeze");
+    try {
+      const result = authority?.frozen
+        ? await client.unfreezeTenant()
+        : await client.freezeTenant(freezeReason.trim());
+      onAuthority(result.data);
+      setFreezeReason("");
+      onNotice({
+        tone: "success",
+        text: result.data.frozen
+          ? "Emergency deny-all freeze is active."
+          : "Workspace unfrozen; normal policy evaluation resumed.",
+        requestId: result.meta.requestId,
+      });
+      onChanged();
+    } catch (cause) {
+      onNotice(errorNotice(cause, "Could not change the workspace freeze state."));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <section className="console-area">
       <AreaHeading
@@ -2014,27 +4213,26 @@ function SettingsArea({
         <section className="console-panel">
           <header className="console-panel__header">
             <div>
-              <span>Environment</span>
-              <h2>{overview?.environment.name ?? "Unavailable"}</h2>
+              <span>Environments</span>
+              <h2>{environments.length || (overview ? 1 : 0)} configured</h2>
             </div>
           </header>
           <dl className="console-definition-list">
-            <div>
-              <dt>ID</dt>
-              <dd>{overview?.environment.id ?? "—"}</dd>
-            </div>
-            <div>
-              <dt>Kind</dt>
-              <dd>{overview?.environment.kind ?? "—"}</dd>
-            </div>
-            <div>
-              <dt>Region</dt>
-              <dd>{overview?.environment.region ?? "—"}</dd>
-            </div>
-            <div>
-              <dt>Revision</dt>
-              <dd>{overview?.environment.revision ?? "—"}</dd>
-            </div>
+            {(environments.length > 0
+              ? environments
+              : overview
+                ? [overview.environment]
+                : []
+            ).map((environment) => (
+              <div key={environment.id}>
+                <dt>{environment.name}</dt>
+                <dd>
+                  {environment.kind} · {environment.region}
+                  <br />
+                  <code>{environment.id}</code>
+                </dd>
+              </div>
+            ))}
           </dl>
         </section>
         <section className="console-panel">
@@ -2097,6 +4295,137 @@ function SettingsArea({
               <dd>Container and Kubernetes</dd>
             </div>
           </dl>
+        </section>
+        <section className="console-panel">
+          <header className="console-panel__header">
+            <div>
+              <span>Authority</span>
+              <h2>Global enforcement state</h2>
+            </div>
+            {authority ? (
+              <StatusBadge value={authority.frozen ? "frozen" : "active"} />
+            ) : null}
+          </header>
+          <dl className="console-definition-list">
+            <div>
+              <dt>Freeze</dt>
+              <dd>{authority?.frozen ? "Deny all" : "Not active"}</dd>
+            </div>
+            <div>
+              <dt>Reason</dt>
+              <dd>{authority?.freezeReason ?? "—"}</dd>
+            </div>
+            <div>
+              <dt>Authorization epoch</dt>
+              <dd>{authority?.authorizationEpoch ?? "—"}</dd>
+            </div>
+            <div>
+              <dt>Active policy</dt>
+              <dd>{authority?.activePolicyId ?? "—"}</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+      <div className="console-split console-split--form">
+        <section className="console-panel">
+          <header className="console-panel__header">
+            <div>
+              <span>Portability</span>
+              <h2>Export or import configuration</h2>
+            </div>
+          </header>
+          <div className="console-form">
+            <div className="console-inline-note">
+              Exports contain catalog, composition, policy, role, and IdP metadata.
+              Secrets and sensitive endpoints are redacted.
+            </div>
+            <button
+              className="console-button console-button--primary"
+              type="button"
+              disabled={busy === "export"}
+              onClick={() => void exportTenant()}
+            >
+              {busy === "export" ? "Preparing export…" : "Download portable export"}
+            </button>
+          </div>
+          <header className="console-panel__header console-panel__subheader">
+            <div>
+              <span>Restore</span>
+              <h2>Import into a pristine workspace</h2>
+            </div>
+          </header>
+          <form className="console-form" onSubmit={importTenant}>
+            <label>
+              <span>Portable JSON</span>
+              <textarea
+                className="console-code-input console-code-input--tall"
+                required
+                value={portableJson}
+                onChange={(event) => setPortableJson(event.target.value)}
+                spellCheck={false}
+                placeholder='{"format":"litemcp.portable.v1", ...}'
+              />
+            </label>
+            <button
+              className="console-button"
+              type="submit"
+              disabled={busy === "import"}
+            >
+              {busy === "import" ? "Importing…" : "Import configuration"}
+            </button>
+          </form>
+        </section>
+
+        <section
+          className={`console-panel console-danger-zone ${authority?.frozen ? "is-frozen" : ""}`}
+        >
+          <header className="console-panel__header">
+            <div>
+              <span>Emergency control</span>
+              <h2>{authority?.frozen ? "Workspace frozen" : "Freeze workspace"}</h2>
+            </div>
+            {authority ? (
+              <StatusBadge value={authority.frozen ? "frozen" : "ready"} />
+            ) : null}
+          </header>
+          <div className="console-form">
+            <p className="console-form-copy">
+              A freeze enables a tenant-wide deny-all overlay, increments the
+              authorization epoch, and invalidates existing MCP credentials.
+            </p>
+            {!authority?.frozen ? (
+              <label>
+                <span>Reason</span>
+                <textarea
+                  required
+                  minLength={2}
+                  maxLength={1000}
+                  value={freezeReason}
+                  onChange={(event) => setFreezeReason(event.target.value)}
+                  placeholder="Security incident or maintenance window"
+                />
+              </label>
+            ) : (
+              <div className="console-token__warning">
+                <strong>Access is currently denied.</strong>
+                <span>{authority.freezeReason ?? "Emergency freeze"}</span>
+              </div>
+            )}
+            <button
+              className={`console-button ${
+                authority?.frozen ? "console-button--primary" : "console-button--danger"
+              }`}
+              type="button"
+              disabled={busy === "freeze" || !authority}
+              onClick={() => void toggleFreeze()}
+            >
+              {busy === "freeze"
+                ? "Applying…"
+                : authority?.frozen
+                  ? "Unfreeze workspace"
+                  : "Freeze all MCP access"}
+            </button>
+          </div>
         </section>
       </div>
     </section>

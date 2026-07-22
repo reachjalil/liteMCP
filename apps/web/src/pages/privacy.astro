@@ -1,0 +1,131 @@
+---
+import PageHero from "../components/PageHero.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+---
+
+<SiteLayout title="Privacy Policy" description="How the LiteMCP Composer managed-cloud preview collects, uses, shares, and protects account, configuration, and operational data.">
+  <PageHero
+    eyebrow="Legal · Managed-cloud preview"
+    title="Privacy Policy"
+    description="This policy describes the hosted preview. A self-hosted operator controls its own deployment and data practices."
+    signal="Effective 21 July 2026"
+  >
+    <Fragment slot="actions">
+      <a class="button button--primary button--large" href="/terms">Terms of Service</a>
+      <a class="button button--large" href="/security">Security model</a>
+    </Fragment>
+  </PageHero>
+
+  <section class="content-section">
+    <div class="shell">
+      <article class="prose">
+        <p>
+          This Privacy Policy applies to the LiteMCP Composer website and managed-cloud preview
+          (the “Service”). It does not control a self-hosted installation or an upstream MCP
+          server you choose to connect. The LiteMCP Composer project maintainers operate the
+          current preview; a formal commercial operator and address have not been announced.
+          The Service must not represent general availability until that controller information
+          and production retention terms are published.
+        </p>
+
+        <h2 id="data">1. Information we process</h2>
+        <ul>
+          <li><strong>Account data:</strong> name, email address, verification state, password credential hash, sessions, authentication factors, and recovery records.</li>
+          <li><strong>Organization data:</strong> memberships, roles, invitations, identity-provider metadata, API-key metadata, and administrator actions.</li>
+          <li><strong>Product configuration:</strong> MCP server definitions, compositions, environments, policies, approvals, session metadata, and configuration exports.</li>
+          <li><strong>Operational data:</strong> request identifiers, timestamps, route and outcome data, IP address and user-agent information received by authentication or infrastructure layers, rate-limit counters, security events, and audit records.</li>
+          <li><strong>Communications:</strong> email delivery metadata and information you include in support, security, or design-partner messages.</li>
+        </ul>
+        <p>
+          MCP tool arguments and responses necessarily pass between your client and the upstream
+          server during execution. The product is designed to avoid storing their plaintext in
+          audit records; approval records use an arguments hash. Infrastructure and upstream
+          behavior still require production validation, so do not send sensitive payloads to the
+          public preview.
+        </p>
+
+        <h2 id="purpose">2. Why we use information</h2>
+        <p>We process information to:</p>
+        <ul>
+          <li>create and secure accounts, sessions, organizations, and invitations;</li>
+          <li>provide composition, policy, routing, approval, audit, and export features;</li>
+          <li>deliver verification, password-reset, invitation, and service emails;</li>
+          <li>prevent abuse, enforce rate limits, troubleshoot failures, and protect tenants;</li>
+          <li>understand preview activation and improve reliability; and</li>
+          <li>comply with law and respond to valid legal requests.</li>
+        </ul>
+        <p>
+          Where data-protection law applies, the relevant bases are performing the service you
+          request, legitimate interests in operating and securing the preview, compliance with
+          legal obligations, and consent where specifically requested. We do not sell personal
+          information or use it for third-party behavioral advertising.
+        </p>
+
+        <h2 id="sharing">3. Service providers and disclosure</h2>
+        <p>
+          The current managed-cloud composition uses Cloudflare for website delivery, Worker
+          execution, and KV/D1 storage. Resend is used when transactional email is enabled. These
+          providers process data on our behalf under their own infrastructure and contractual
+          controls. Tool-call data is also sent to the upstream MCP server and network provider
+          selected by your organization.
+        </p>
+        <p>
+          We may disclose information when required by law, to protect rights and security, or as
+          part of a future organizational transfer with appropriate notice and safeguards. We do
+          not disclose one tenant's data to another tenant.
+        </p>
+
+        <h2 id="international">4. International processing</h2>
+        <p>
+          Infrastructure providers may process data in countries other than yours. Before the
+          Service accepts production customers, regional availability, transfer mechanisms, and
+          processor terms must be published. The preview makes no data-residency commitment.
+        </p>
+
+        <h2 id="retention">5. Retention and deletion</h2>
+        <p>
+          We keep account and configuration data while the account or organization is active and
+          as needed for security, backup, dispute, and legal purposes. The preview does not yet
+          claim a validated fixed retention or backup-deletion schedule. This is a release blocker,
+          not permission to retain data indefinitely: deletion requests will be handled manually
+          while automated lifecycle controls are completed.
+        </p>
+
+        <h2 id="cookies">6. Cookies</h2>
+        <p>
+          The Service uses necessary authentication and security cookies. It does not currently
+          advertise marketing cookies or third-party behavioral tracking. If optional analytics or
+          other non-essential cookies are introduced, this policy and any required consent controls
+          will be updated first.
+        </p>
+
+        <h2 id="rights">7. Your choices and rights</h2>
+        <p>
+          Depending on where you live, you may request access, correction, export, deletion,
+          restriction, or objection; withdraw consent; or complain to a data-protection authority.
+          Organization administrators may control some records first. We may need to verify your
+          identity and retain limited information where law or security requires it.
+        </p>
+        <p>
+          Send a privacy request to
+          <a href="mailto:enterprise@litemcpcomposer.com?subject=LiteMCP%20Composer%20privacy%20request">enterprise@litemcpcomposer.com</a>
+          with “privacy request” in the subject. Do not include passwords, API keys, tokens, or
+          sensitive tool payloads in email.
+        </p>
+
+        <h2 id="security">8. Security and children</h2>
+        <p>
+          Security controls and current limitations are described on the <a href="/security">security page</a>.
+          No online service can guarantee absolute security. The Service is intended for workplace
+          users and is not directed to children under 16.
+        </p>
+
+        <h2 id="changes">9. Changes</h2>
+        <p>
+          We will update the effective date when this policy changes. Material changes will receive
+          reasonable website, in-product, or email notice when account service is available.
+        </p>
+      </article>
+    </div>
+  </section>
+</SiteLayout>

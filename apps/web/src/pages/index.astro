@@ -27,7 +27,7 @@ const controlFeatures = [
   {
     title: "Govern the upstream route",
     description:
-      "Pause sensitive requests before dispatch and retain provenance plus audit evidence; health-aware route selection remains planned.",
+      "Pause sensitive requests before dispatch, require exact one-shot approval, and retain provenance plus audit evidence; multi-route selection remains planned.",
     status: "Preview" as const,
   },
 ];
@@ -106,12 +106,12 @@ const controlFeatures = [
           <article>
             <span>04 / Invoke · Preview</span>
             <strong>One policy at list and call</strong>
-            <p>Invocation repeats enforcement and can pause a sensitive request; independent approval decisions and resume remain planned.</p>
+            <p>Invocation repeats enforcement and can pause exact tool arguments for one-shot approval before a bound retry.</p>
           </article>
           <article>
             <span>05 / Route · Planned</span>
             <strong>Eligible, healthy upstreams</strong>
-            <p>Explicit upstream dispatch exists; identity-, health-, region-, and residency-aware route selection remains planned.</p>
+            <p>Explicit dispatch now requires a healthy, non-quarantined pinned upstream; identity-, region-, and residency-aware selection remains planned.</p>
           </article>
           <article>
             <span>06 / Prove · Preview</span>
@@ -166,7 +166,7 @@ const controlFeatures = [
         <ol class="signal-steps">
           <li>
             <span>01</span>
-            <div><strong>Resolve the principal</strong><p>Authenticated subjects and scoped sessions work today; live enterprise group and claim mapping remains preview work.</p></div>
+            <div><strong>Resolve the principal</strong><p>Authenticated subjects, scoped sessions, roles, assignments, and configured group mappings work today; live enterprise-provider validation remains preview work.</p></div>
           </li>
           <li>
             <span>02</span>
@@ -187,7 +187,7 @@ const controlFeatures = [
       <header class="section-header section-header--row">
         <div>
           <p class="eyebrow">The platform</p>
-          <h2>Seven MCP-native planes. One open roadmap.</h2>
+          <h2>Seven MCP-native planes. One complete open product.</h2>
           <p>
             Available, preview, and planned capabilities are labeled on each product page. The
             architecture keeps managed cloud infrastructure out of the portable product core.
@@ -248,20 +248,20 @@ const controlFeatures = [
   <section class="content-section content-section--subtle">
     <div class="shell">
       <SectionHeader
-        eyebrow="One open product"
-        title="One open codebase. Two deployment targets in preview."
-        description="The repository is pre-1.0. Capability status is shared across deployment targets; enterprise services are intended to fund accountable deployment and operations, not closed features."
+        eyebrow="Open product · operated service"
+        title="A complete public core for both deployment paths."
+        description="The repository is pre-1.0. Both paths consume the public product; managed cloud adds a private service-control plane for billing, customer lifecycle, support access, provisioning, and fleet operations."
       />
       <div class="price-grid">
         <article class="price-card">
           <span class="price-card__label">Managed cloud · Preview</span>
           <h2>Managed cloud target</h2>
-          <div class="price-card__price">$0 <small>/ intended community model</small></div>
-          <p>The Worker bundle and local data migration build; no public operated service is claimed yet.</p>
+          <div class="price-card__price">$0 <small>/ preview</small></div>
+          <p>The public Worker preview is live with controlled registration and no uptime or support commitment.</p>
           <ul class="check-list">
-            <li>Cloudflare-backed deployment source</li>
-            <li>Wrangler dry-run and local D1 migration</li>
-            <li>Fair-use thresholds planned before availability</li>
+            <li>Complete public product core</li>
+            <li>Private operated-service control plane</li>
+            <li>5 servers, 5 compositions, 25 sessions, 1,000 calls/day</li>
           </ul>
           <a class="button" href="/cloud">Managed cloud details</a>
         </article>

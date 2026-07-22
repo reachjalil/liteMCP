@@ -4,6 +4,7 @@ import "../styles/global.css";
 
 const apiBaseUrl = import.meta.env.PUBLIC_API_ORIGIN ?? import.meta.env.API_ORIGIN ?? "";
 const demoMode = import.meta.env.LITEMCP_DEMO_MODE === "true";
+const signupsEnabled = demoMode || import.meta.env.SIGNUPS_ENABLED === "true";
 ---
 
 <!doctype html>
@@ -21,6 +22,6 @@ const demoMode = import.meta.env.LITEMCP_DEMO_MODE === "true";
     </script>
   </head>
   <body>
-    <LoginApp client:load apiBaseUrl={apiBaseUrl} demoMode={demoMode} />
+    <LoginApp client:load apiBaseUrl={apiBaseUrl} demoMode={demoMode} signupsEnabled={signupsEnabled} />
   </body>
 </html>

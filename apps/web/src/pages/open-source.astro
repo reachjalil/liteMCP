@@ -5,8 +5,8 @@ import SiteLayout from "../layouts/SiteLayout.astro";
 
 const commitments = [
   [
-    "One open roadmap",
-    "Available, preview, and planned gateway, registry, policy, identity, audit, and deployment work stays public.",
+    "A complete open product",
+    "Gateway, registry, policy, identity, audit, portability, and self-hosted deployment capabilities stay public.",
   ],
   [
     "No license server",
@@ -18,7 +18,7 @@ const commitments = [
   ],
   [
     "Open compatibility",
-    "SDKs and gateway fixtures are public; the connector and named-client compatibility matrix is planned.",
+    "SDKs, gateway fixtures, and the named-client matrix are public; no named client is marked verified without a recorded run.",
   ],
   [
     "Visible security process",
@@ -31,12 +31,12 @@ const commitments = [
 ];
 ---
 
-<SiteLayout title="Open source" description="LiteMCP Composer is an Apache-2.0 MCP composition control plane with a call-home-free self-hosted preview and a fully public product roadmap.">
+<SiteLayout title="Open source" description="LiteMCP Composer is a complete Apache-2.0 MCP composition control plane. Its self-hosted distribution remains call-home-free; the optional operated service has a separate private control plane.">
   <PageHero
     eyebrow="Open-source commitment"
-    title="The whole MCP-native roadmap stays open."
-    description="LiteMCP Composer is licensed under Apache 2.0. Current code and future security, identity, policy, audit, high-availability, and on-prem work are intended to mature in public—not behind closed feature gates."
-    signal="Operational services, not hidden features"
+    title="The product stays open. The operated service is separate."
+    description="LiteMCP Composer is licensed under Apache 2.0. Security, identity, policy, audit, portability, high-availability, and on-prem capabilities mature in public. Private code is limited to operating our hosted service: customer lifecycle, billing, support access, provisioning, and fleet releases."
+    signal="Complete open product · optional managed operations"
   >
     <Fragment slot="actions">
       <a class="button button--primary button--large" href="https://github.com/reachjalil/liteMCP">View GitHub ↗</a>
@@ -50,7 +50,7 @@ const commitments = [
       <SectionHeader
         eyebrow="Project covenant"
         title="Portable by architecture and by policy."
-        description="These boundaries are part of the product definition and should be reviewable in source, tests, and release artifacts."
+        description="The self-hosted product is independently operable without private code, a license server, a cloud account, or a hosted-service dependency."
       />
       <div class="feature-grid">
         {commitments.map(([title, description], index) => (

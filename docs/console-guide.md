@@ -13,9 +13,11 @@ The current console is an early, connected vertical slice. Screens described as
 
 In production, Better Auth supplies the user, active organization, and
 membership role. The server ignores demo tenant/role headers and replaces a
-caller-supplied session subject with the authenticated user. Configure identity
-providers and first-admin bootstrap before exposing this mode publicly; the
-bootstrap journey is not complete today.
+caller-supplied session subject with the authenticated user. The login UI can
+create a first organization and the server bootstraps its starter environment,
+roles, empty composition, and policy idempotently. Configure email and identity
+providers before exposing this mode publicly; no deployed first-admin journey
+has passed.
 
 ### Explicit demo mode
 
@@ -28,13 +30,13 @@ while active. It is not an impersonation or production support mechanism.
 | Area | Current functionality | Availability |
 | --- | --- | --- |
 | Overview | Organization/environment summary, gateway endpoint/protocol/store, counts, setup progress, and recent audit | Available now |
-| MCP catalog | List registered servers and register one definition with transport, endpoint/command metadata, version, tools, visibility, and tags | Available now for create/list; lifecycle is Preview |
-| Composer | List compositions and create a first pinned, namespaced member in the active environment | Available now for the slice; graph editor/diff/promotion are Designed |
-| Identity & sessions | List provider metadata and issue a short-lived session; token is displayed once | Preview; production identity comes from the authenticated session |
-| Policy simulator | Select policy context and explain allow/deny/approval for subject/action/tool/risk | Available now for the current policy model |
-| Approvals | View pending approval metadata and correlated audit events | Preview; decision/resume workflow is not implemented |
-| Observability | Gateway state, audit totals, and redacted audit ledger | Preview; OTel/traces/metrics/SIEM are Designed |
-| Settings | Organization/environment/runtime details and portable export action | Preview; full configuration lifecycle/import is not implemented |
+| MCP catalog | Create/list/update/delete servers, manually probe/import tools, review health/drift, and accept an intentional drift | Preview; no authenticated or scheduled upstream discovery E2E |
+| Composer | Create/edit multi-member pinned compositions, aliases, publish a version bump, and delete unused compositions | Preview; immutable diff/rollback history is absent |
+| Identity & sessions | Issue/list/revoke short-lived sessions; manage roles/assignments and encrypted IdP control records; create a service principal with one-time secret display | Preview; live IdP/member and complete principal lifecycle are absent |
+| Policy simulator | Create/edit/lint/activate/archive policy drafts, simulate decisions, and operate the emergency freeze overlay | Preview; multi-record transaction/rollback and external identity proof are absent |
+| Approvals | View bound approval metadata and approve/deny using the current generation/fingerprint | Preview; retry remains client-driven and no deployed two-user notification journey exists |
+| Observability | Six API-backed Insight views, date ranges, exact quota standing, payload-free event/audit linkage, and CSV export | Preview; no browser/deployment proof, complete managed history, push live transport, OTel, alerts, or SIEM |
+| Settings | Organization/environment/runtime/authority details, freeze controls, and portable import/export | Preview; import is restricted to a pristine target and no live cross-target journey exists |
 
 The URL hash selects an area, for example `/app#composer` or `/app#policy`.
 
@@ -44,8 +46,10 @@ The URL hash selects an area, for example `/app#composer` or `/app#policy`.
 2. Enter a stable name and slug.
 3. Select the transport.
 4. For remote HTTP, provide a credential-free HTTP(S) endpoint.
-5. Provide a version and tool metadata.
-6. Submit and retain the returned request ID shown in the notice.
+5. Create the server, then run **Probe + import** to perform upstream
+   `initialize` and `tools/list`.
+6. Review imported schemas, health, version pin, and any drift quarantine before
+   publishing a composition.
 
 Remote endpoints cannot include credentials, query strings, fragments, invalid
 percent encoding, or credential-like path segments. Connected-account and
@@ -60,10 +64,10 @@ credential-profile selection are not available yet.
 5. Set a stable namespace.
 6. Create the composition.
 
-The current form creates one initial member. The domain/API support member and
-alias arrays, but the full multi-member graph, schema conflict/diff, promotion,
-and rollback experience remains planned. Draft compositions cannot issue a
-session or execute.
+The form supports multiple enabled members, stable namespaces, pinned versions,
+and aliases. Save changes as a draft, then publish after every selected member
+has a healthy accepted probe. Draft compositions cannot issue a session or
+execute. Immutable graph history, schema diff UX, and rollback remain absent.
 
 ## Simulate policy
 
@@ -78,8 +82,10 @@ For each simulation, inspect:
 - role/group/tool/risk inputs;
 - request ID when the API reports an error.
 
-Policy edit, activation, diff, rollback, and distributed invalidation are not
-complete in the current console.
+The same area can create/edit drafts, show lint findings, activate a valid draft,
+archive an inactive policy, and freeze/unfreeze the tenant. Activation advances
+the authorization epoch. Version comparison, rollback history, and deployed
+distributed invalidation proof remain absent.
 
 ## Issue and revoke a session
 
@@ -89,10 +95,10 @@ into an approved client and avoid screenshots, tickets, chat messages, and shell
 history.
 
 In authenticated production mode, subject fields in the request are not an
-impersonation mechanism: the server binds the authenticated identity. Explicit
-revoke is implemented through the API/SDK. A session inventory and revoke
-button are still required in the console, as are automatic revocation epochs
-for logout, SCIM deprovisioning, and role/group changes.
+impersonation mechanism: the server binds the authenticated identity. The
+console lists sessions and can revoke an active token. Authorization epochs
+cover LiteMCP role/policy/IdP/freeze changes, but automatic propagation from
+Better Auth logout/ban/membership removal and SCIM is not wired.
 
 ## Audit and approvals
 
@@ -101,9 +107,45 @@ request correlation. It intentionally does not show raw credentials. Payload
 capture is not a current feature.
 
 Approval-required execution creates a pending record before upstream dispatch.
-The console lists those records but does not yet authorize an independent
-approver decision or resume the exact request. Do not present the current view
-as a complete approval workflow.
+The console lists the full non-payload binding and lets a different
+owner/admin/approver approve or deny using the current generation and
+fingerprint. An approval is consumed once only when the original client retries
+the exact execution context. The server does not store arguments or resume a
+call after a crash, and no native email/Slack or deployed multi-user workflow is
+proved.
+
+## Usage observability
+
+Observability is a separate, management-gated Insight Plane rather than a
+relabelled audit table:
+
+1. **Dashboard** shows tool-attempt KPIs, denial/error rates, p50/p95 latency,
+   top tools, self-reported clients, opaque subject IDs, and exact quota
+   standing.
+2. **Live** shows the recent payload-free event tail, active sessions, pending
+   approvals, and a calls-per-minute sparkline. It polls every five seconds
+   only while the view is open and pauses while the document is hidden.
+3. **Tools** ranks canonical tools and drills into volume, denials, errors,
+   latency, callers, clients, rules, and servers.
+4. **Identities** groups events by opaque `subjectId`; the API does not join
+   profile display names or email addresses into analytics.
+5. **Sessions** renders a relative timeline and total/upstream latency
+   waterfall, with `requestId` and available audit ID/sequence/hash receipts.
+6. **Policy insights** shows rule hits/zero-hit rules, denial hotspots,
+   discovery-to-execution conversion, unused visible tools, approval latency,
+   and successful tool-to-tool flows.
+
+Use the 24-hour, 7-day, and 30-day presets or refresh the current range. Export
+downloads the selected view as CSV. Client name/version labels are supplied by
+the connecting MCP client's `initialize` request and are self-reported, not a
+verified named-client attestation.
+
+Analytics never contains tool arguments or results. It is fail open and may be
+incomplete; audit remains the fail-closed evidence path. Managed-cloud queries
+currently read a capped exact event feed, so a selected date range can exceed
+the retained feed history. There is no WebSocket/SSE live path or browser E2E
+proof in this revision. See
+[`usage-observability.md`](./usage-observability.md).
 
 ## Errors and recovery
 
@@ -121,11 +163,12 @@ idempotency is not complete, so avoid blind repeated submissions.
 
 ## Planned enterprise surfaces
 
-The product contract also requires onboarding, organization/workspace/project
-administration, users/groups/custom roles/service principals, connected
-accounts and credential profiles, composition graph/diff/promotion, route and
-health editor, session inventory, independent approval decisions, triggers,
-traces/metrics, API credentials, import, and deployment diagnostics. These are
-tracked in [`feature-reference.md`](./feature-reference.md) and
+The product contract still requires complete organization/member administration,
+connected accounts and credential profiles, immutable composition/policy
+diff/rollback, health/region/credential routing, complete service-principal
+lifecycle, triggers, OpenTelemetry, alerts/SIEM, production API credentials,
+and deployment diagnostics. Insight O-F (alerts, digests, and SIEM push) remains
+outstanding. These are tracked in
+[`feature-reference.md`](./feature-reference.md) and
 [`requirements-traceability.md`](./requirements-traceability.md); they should
 not be inferred from navigation labels alone.

@@ -87,23 +87,78 @@ Keep `requestId` when opening an incident or correlating API and audit records.
 | `GET /api/auth/*` / `POST /api/auth/*` | Better Auth routes | Provider/session specific |
 | `GET /api/v1/openapi.json` | OpenAPI 3.1 document | Authenticated API boundary |
 | `GET /api/v1/overview` | Tenant overview and counts | Active member |
+| `GET /api/v1/environments` | List tenant environments | Active member |
 | `GET /api/v1/servers` | List server definitions | Active member |
-| `POST /api/v1/servers` | Register a server | Owner/admin |
+| `POST/PATCH/DELETE /api/v1/servers[/{id}]` | Register, update, or delete a server | Owner/admin |
+| `POST /api/v1/servers/{id}/probe` | Initialize upstream, import tools, and evaluate drift | Owner/admin |
 | `GET /api/v1/compositions` | List compositions | Active member |
-| `POST /api/v1/compositions` | Create a composition | Owner/admin |
-| `GET /api/v1/policies` | List policy versions | Active member |
+| `POST/PATCH/DELETE /api/v1/compositions[/{id}]` | Create, update, or delete a composition | Owner/admin |
+| `POST /api/v1/compositions/{id}/publish` | Publish a healthy pinned composition version | Owner/admin |
+| `GET/POST/PATCH /api/v1/policies[/{id}]` | List, create, or update policy drafts | Owner/admin |
+| `GET /api/v1/policies/{id}/lint` | Return deterministic conflict/unreachable findings | Owner/admin |
+| `POST /api/v1/policies/{id}/activate` or `/archive` | Change policy lifecycle and authorization epoch | Owner/admin |
 | `POST /api/v1/policy/simulate` | Explain a discovery/execution decision | Owner/admin |
 | `POST /api/v1/sessions` | Issue a scoped MCP session for the authenticated subject | Active member |
+| `GET /api/v1/sessions` | List redacted tenant sessions | Owner/admin |
 | `POST /api/v1/sessions/{id}/revoke` | Revoke an owned session; administrators may revoke any tenant session | Subject or owner/admin |
+| `/api/v1/roles` and `/api/v1/role-assignments` | Manage platform roles and subject assignments | Owner/admin |
 | `GET /api/v1/audit?limit=100` | List redacted audit events | Owner/admin |
-| `GET /api/v1/identity-providers` | List configured provider metadata | Owner/admin |
+| `GET /api/v1/analytics/summary` | Usage KPIs, rates, latency percentiles, and pending approvals | Owner/admin |
+| `GET /api/v1/analytics/timeseries?metric=...&interval=...` | Calls, denials, errors, or p95-latency buckets | Owner/admin |
+| `GET /api/v1/analytics/top?dimension=...&metric=...` | Ranked tools, opaque subject IDs, reported clients, rules, or servers | Owner/admin |
+| `GET /api/v1/analytics/recent` | Cursor-paginated payload-free usage facts | Owner/admin |
+| `GET /api/v1/analytics/sessions/{id}/timeline` | Session timeline with request/audit receipts | Owner/admin |
+| `GET /api/v1/analytics/flows` | Successful tool-to-tool transitions | Owner/admin |
+| `GET /api/v1/analytics/policy-insights` | Rule hits, denial hotspots, conversion, and approval latency | Owner/admin |
+| `GET /api/v1/usage` | Exact resource and UTC-day call quota standing | Owner/admin |
+| `/api/v1/identity-providers` | Manage encrypted IdP control records | Owner/admin |
 | `GET /api/v1/approvals` | List pending/decided approval metadata | Owner/admin |
-| `GET /api/v1/export` | Export non-secret portable configuration | Owner/admin |
+| `POST /api/v1/approvals/{id}/decision` | Approve/deny the current generation and fingerprint | Owner/admin/approver other than requester |
+| `GET /api/v1/authority`, `POST /api/v1/tenant/{freeze,unfreeze}` | Inspect or operate the emergency authority overlay | Owner/admin |
+| `POST /api/v1/service-principals` | Create a one-time-secret workload identity | Owner/admin |
+| `POST /api/v1/subjects/{id}/deprovision` | Remove assignments, disable matching principal, and revoke sessions | Owner/admin |
+| `GET /api/v1/export`, `POST /api/v1/import` | Export/import validated non-secret portable configuration | Owner/admin |
+| `/.well-known/...`, `/oauth/{tenantId}/{register,authorize,token,revoke}` | MCP OAuth metadata, consent, PKCE/token, and revocation | Public protocol endpoints plus authenticated consent |
 | `POST /mcp/{tenantId}/{compositionSlug}` | MCP JSON-RPC initialize/list/call | Scoped MCP bearer token |
 
-Create/update/delete coverage is intentionally incomplete in this early slice.
-The absence of a route in this table means it is not yet a supported public
-operation, even when a domain schema exists.
+This table groups related lifecycle routes; the generated OpenAPI document is
+the exact request/response inventory. Live identity-provider registration,
+connected accounts, SCIM server routes, and complete service-principal
+lifecycle are not implied by the control-record endpoints above.
+
+## Insight Plane query rules
+
+Analytics is separate from the audit chain. Usage emission is fail open and
+may be disabled or lossy; required audit checkpoints remain fail closed. The
+strict usage contract stores bounded dimensions and measures only and rejects
+tool argument/result fields. `requestId` and an optional audit
+ID/sequence/hash receipt provide correlation without treating analytics as
+compliance evidence.
+
+All `/analytics/*` and `/usage` routes require an owner/admin management role.
+The server takes the tenant from the authenticated actor; `tenantId` is not an
+accepted query selector. Analytics windows use `[from, to)`, default to the
+previous 24 hours, and cannot exceed 30 days. Unknown or repeated query
+parameters fail validation. Add `format=csv` for a private, non-cacheable CSV
+download; JSON remains the default.
+
+Client names and versions come from MCP `initialize` and are self-reported.
+They are useful attribution labels, not verified application identity. Subject
+analytics returns stable opaque subject IDs and does not join them to profile
+display names or email addresses.
+
+`GET /api/v1/usage` reads exact inventory and daily authority counters, not
+Analytics Engine, Mongo samples, or the managed feed. It therefore remains
+available when analytics is disabled. Other analytics routes return an
+unavailable problem when no query adapter is configured.
+
+In managed cloud, the current query adapter reads a per-tenant exact ring
+capped at 500 newest events by default. Analytics Engine receives trend rows
+but has no SQL query proxy in this revision, so a 30-day request is not a claim
+that every 30-day event remains in the feed. Portable Mongo queries read the
+tenant-filtered `usage_events` time-series collection within configured range
+and scan caps. See
+[`usage-observability.md`](./usage-observability.md) for the complete boundary.
 
 ## Curl walkthrough
 
@@ -206,9 +261,10 @@ const tools = await mcp.listTools();
 const result = await mcp.callTool("sum", { a: 2, b: 3 });
 ```
 
-Control-plane methods currently include `overview`, `servers`, `compositions`,
-`policies`, `audit`, `simulatePolicy`, `createSession`, `revokeSession`, and
-`exportConfiguration`.
+The control-plane client covers environments, server/composition/policy
+lifecycle, sessions, roles/assignments, IdP records, approvals, authority,
+service-principal creation/session issuance, activation events, and portable
+import/export. See the package README for exact method names.
 
 ## Python SDK
 
@@ -238,15 +294,11 @@ Run the workspace CLI with:
 pnpm --filter @litemcp/cli dev -- help
 ```
 
-Implemented commands:
-
-| Command | Purpose |
-| --- | --- |
-| `doctor` | Call `/health` and report local Node/API context |
-| `status` | Show the tenant overview |
-| `export` | Print non-secret portable configuration as JSON |
-| `policy-test` | Explain one policy decision |
-| `session-create` | Issue a short-lived scoped MCP session |
+`litemcp help` lists the implemented registry/probe, composition/publish,
+policy/lint/activation, session, role, IdP, approval, authority, service
+principal, activation-event, and import/export commands. Create/update commands
+accept `--file` or `--input`; approval decisions require the current generation
+and fingerprint.
 
 Global options include `--api`, `--tenant`, `--role`, and `--json`. Environment
 fallbacks are `LITEMCP_API_URL`, `LITEMCP_TENANT_ID`, and

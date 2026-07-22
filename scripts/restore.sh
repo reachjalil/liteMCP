@@ -109,7 +109,7 @@ case "$RESTORE_MODE" in
       --env-file "$COMPOSE_ENV_FILE" \
       -f "$COMPOSE_FILE" \
       exec -T mongodb \
-      mongorestore --quiet --archive --gzip --drop --nsInclude='litemcp.*' <"$ARCHIVE_PATH"
+      sh -ec 'exec mongorestore --quiet --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --archive --gzip --drop --nsInclude="litemcp.*"' <"$ARCHIVE_PATH"
     ;;
   external)
     command -v mongorestore >/dev/null 2>&1 || {

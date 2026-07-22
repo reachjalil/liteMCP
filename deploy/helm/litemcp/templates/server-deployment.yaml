@@ -76,6 +76,16 @@ spec:
               containerPort: 8787
               protocol: TCP
           env:
+            - name: ANALYTICS_ENABLED
+              value: {{ .Values.analytics.enabled | quote }}
+            - name: ANALYTICS_RETENTION_DAYS
+              value: {{ .Values.analytics.retentionDays | quote }}
+            - name: ANALYTICS_MAX_QUEUE_SIZE
+              value: {{ .Values.analytics.maxQueueSize | quote }}
+            - name: ANALYTICS_BATCH_SIZE
+              value: {{ .Values.analytics.batchSize | quote }}
+            - name: ANALYTICS_FLUSH_INTERVAL_MS
+              value: {{ .Values.analytics.flushIntervalMs | quote }}
             - name: NODE_ENV
               value: production
             - name: PORT

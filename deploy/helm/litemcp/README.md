@@ -62,6 +62,31 @@ Secret references and `WEB_ORIGIN`/`API_ORIGIN` from a ConfigMap. Demo mode is
 disabled by default. The web container proxies same-origin API, auth, MCP, and
 readiness requests to the release-qualified server Service.
 
+Payload-free tenant analytics is enabled by default through the `analytics`
+values group. It writes to a MongoDB time-series collection with a 90-day
+retention default and a bounded, fail-open process queue. Tune
+`retentionDays`, `maxQueueSize`, `batchSize`, and `flushIntervalMs`, or set
+`analytics.enabled=false` to disable the Insight Plane. These trend events are
+separate from exact quota counters and never contain tool arguments or results.
+
+The self-hosted runtime is effectively unlimited by default. To add local
+capacity guardrails, supply the four `LITEMCP_QUOTA_*` variables through
+`server.env`; they are ordinary operator configuration and never a license or
+call-home mechanism.
+
+```yaml
+server:
+  env:
+    - name: LITEMCP_QUOTA_SERVERS
+      value: "100"
+    - name: LITEMCP_QUOTA_COMPOSITIONS
+      value: "100"
+    - name: LITEMCP_QUOTA_ACTIVE_SESSIONS
+      value: "1000"
+    - name: LITEMCP_QUOTA_TOOL_CALLS_PER_DAY
+      value: "1000000"
+```
+
 The default ingress sends `/api` and `/mcp` to the server and `/` to the web
 service. Long-lived MCP responses may require ingress-controller-specific
 streaming and timeout annotations; the HA example includes nginx settings.

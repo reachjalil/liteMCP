@@ -109,11 +109,37 @@ check_compose() {
   fi
 
   local auth_secret
+  local credential_key
+  local mongodb_password
+  local mongodb_replica_key
   auth_secret=$(read_env_value BETTER_AUTH_SECRET "$COMPOSE_ENV_FILE")
   if [[ ${#auth_secret} -lt 32 || "$auth_secret" == replace-* ]]; then
     fail "BETTER_AUTH_SECRET must be a non-placeholder value of at least 32 characters"
   else
     pass "BETTER_AUTH_SECRET is present and has an acceptable length"
+  fi
+
+  credential_key=$(read_env_value CREDENTIAL_MASTER_KEY "$COMPOSE_ENV_FILE")
+  if [[ ${#credential_key} -lt 32 || "$credential_key" == replace-* ]]; then
+    fail "CREDENTIAL_MASTER_KEY must be a non-placeholder value of at least 32 characters"
+  else
+    pass "CREDENTIAL_MASTER_KEY is present and has an acceptable length"
+  fi
+
+  mongodb_password=$(read_env_value MONGODB_PASSWORD "$COMPOSE_ENV_FILE")
+  if [[ ${#mongodb_password} -lt 24 || "$mongodb_password" == replace-* ]]; then
+    fail "MONGODB_PASSWORD must be a non-placeholder URI-safe value of at least 24 characters"
+  elif [[ "$mongodb_password" =~ [^A-Za-z0-9._~-] ]]; then
+    fail "MONGODB_PASSWORD must be URI-safe without percent encoding"
+  else
+    pass "MONGODB_PASSWORD is present and URI-safe"
+  fi
+
+  mongodb_replica_key=$(read_env_value MONGODB_REPLICA_SET_KEY "$COMPOSE_ENV_FILE")
+  if [[ ${#mongodb_replica_key} -lt 32 || "$mongodb_replica_key" == replace-* ]]; then
+    fail "MONGODB_REPLICA_SET_KEY must be a non-placeholder value of at least 32 characters"
+  else
+    pass "MONGODB_REPLICA_SET_KEY is present and has an acceptable length"
   fi
 
   if docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" config --quiet; then

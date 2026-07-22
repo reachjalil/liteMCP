@@ -3,6 +3,7 @@ ARG NODE_IMAGE=node:24-alpine
 FROM ${NODE_IMAGE} AS build
 
 ARG PNPM_VERSION=10.30.2
+ARG SIGNUPS_ENABLED=false
 WORKDIR /workspace
 
 RUN corepack enable && corepack prepare "pnpm@${PNPM_VERSION}" --activate

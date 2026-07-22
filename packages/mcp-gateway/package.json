@@ -26,6 +26,7 @@
     "ajv-formats": "catalog:"
   },
   "devDependencies": {
+    "@litemcp/analytics": "workspace:*",
     "@litemcp/storage": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"

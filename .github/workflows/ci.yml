@@ -83,6 +83,60 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
+  managed-cloud-wrangler:
+    name: Managed cloud Wrangler dry runs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify production and staging target isolation
+        run: node scripts/check-managed-cloud-wrangler.mjs
+      - name: Build production managed-cloud static assets
+        run: pnpm --filter @litemcp/managed-cloud build:web
+      - name: Wrangler production dry run
+        run: >-
+          pnpm --filter @litemcp/managed-cloud exec wrangler deploy
+          --dry-run --env= --outdir /tmp/litemcp-wrangler-production
+      - name: Build staging managed-cloud static assets
+        run: pnpm --filter @litemcp/managed-cloud build:web:staging
+      - name: Wrangler staging dry run
+        run: >-
+          pnpm --filter @litemcp/managed-cloud exec wrangler deploy
+          --dry-run --env staging --outdir /tmp/litemcp-wrangler-staging
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Scan Git history with Gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Block newly introduced high-severity advisories
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: high
+
   helm:
     name: Helm
     runs-on: ubuntu-latest
@@ -107,6 +161,8 @@ jobs:
     timeout-minutes: 10
     env:
       BETTER_AUTH_SECRET: ci-only-placeholder-secret-32-characters
+      MONGODB_PASSWORD: ci-only-uri-safe-mongodb-password
+      MONGODB_REPLICA_SET_KEY: ci-only-replica-set-key-32-characters
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: docker compose -f deploy/docker-compose/compose.yaml config --quiet

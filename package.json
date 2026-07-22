@@ -23,6 +23,8 @@
     "types": "turbo run types",
     "managed-cloud:dev": "pnpm --filter @litemcp/managed-cloud dev",
     "managed-cloud:deploy": "pnpm --filter @litemcp/managed-cloud deploy",
+    "managed-cloud:deploy:staging": "pnpm --filter @litemcp/managed-cloud deploy:staging",
+    "managed-cloud:wrangler:check": "node scripts/check-managed-cloud-wrangler.mjs",
     "docker:up": "docker compose -f deploy/docker-compose/compose.yaml up --build",
     "docker:down": "docker compose -f deploy/docker-compose/compose.yaml down",
     "helm:lint": "helm lint --strict deploy/helm/litemcp",

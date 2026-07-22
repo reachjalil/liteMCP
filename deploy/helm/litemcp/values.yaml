@@ -55,6 +55,15 @@ auth:
   annotations: {}
   key: BETTER_AUTH_SECRET
 
+# Payload-free tenant usage analytics. MongoDB stores a time-series collection;
+# exact quota enforcement continues to use separate counters.
+analytics:
+  enabled: true
+  retentionDays: 90
+  maxQueueSize: 10000
+  batchSize: 250
+  flushIntervalMs: 100
+
 autoscaling:
   server:
     enabled: false
