@@ -153,8 +153,9 @@ pnpm harness:preview
 ```
 
 The available profiles focus agents on security, deployment, release,
-observability, identity, MCP compatibility, or fast vertical-slice iteration.
-The selector `.harnessProfile` is local and intentionally not committed.
+observability, identity, MCP compatibility, open-core boundaries, or fast
+vertical-slice iteration. The selector `.harnessProfile` is local and
+intentionally not committed.
 
 The same proof can be run manually against the interactive server:
 

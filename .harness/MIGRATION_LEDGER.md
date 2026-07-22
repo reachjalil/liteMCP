@@ -61,9 +61,9 @@ state before the repository commit showed:
   create/update/remove/orphan;
 - root instructions: two `keep`;
 - source/target skill trees: byte-identical;
-- all seven profile selectors: exactly one matching overlay; neutral selection:
+- all eight profile selectors: exactly one matching overlay; neutral selection:
   zero overlays;
-- all eight repository skills: official `quick_validate.py` pass;
+- all nine portable skills: official `quick_validate.py` pass;
 - generated targets/root instructions/profile selector: ignored; every
   `.harness` source and `skills-lock.json`: trackable; no tracked Harness source
   is ignored.
@@ -81,4 +81,4 @@ The locked repository equivalents are `pnpm harness:validate`,
 `pnpm harness:preview`, `pnpm harness:activate`, and the CI-grade
 `pnpm harness:ci`, which validates, previews, applies inside the disposable CI
 checkout, rejects a non-converged second preview, and exercises neutral plus
-all seven profile selections in isolated temporary workspaces.
+all eight profile selections in isolated temporary workspaces.
