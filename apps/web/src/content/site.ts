@@ -243,7 +243,7 @@ export const productPages: ProductPage[] = [
       {
         title: "Human approval",
         description:
-          "Pause sensitive actions and bind a pending record to the exact request; independent decision and resume are not shipped.",
+          "Pause sensitive actions before dispatch, decide through the console or API, and allow only an identical one-shot retry. Arguments are not retained for automatic server-side resume.",
         status: "Preview",
       },
       {
@@ -488,11 +488,11 @@ export const productLinks = productPages.map(({ slug, title }) => ({
 
 export const publicNavigation = [
   { href: "/product/composer", label: "Product" },
-  { href: "/cloud", label: "Managed cloud" },
-  { href: "/open-source", label: "Open source" },
+  { href: "/security", label: "Security" },
   { href: "/docs", label: "Docs" },
+  { href: "/open-source", label: "Open source" },
   { href: "/pricing", label: "Pricing" },
-  { href: "/enterprise", label: "Enterprise" },
+  { href: "/design-partners", label: "Design partners" },
 ];
 
 export const platformLayers = [

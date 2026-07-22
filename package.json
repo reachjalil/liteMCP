@@ -11,7 +11,9 @@
   },
   "scripts": {
     "build": "turbo run build",
-    "check": "pnpm format:check && pnpm lint && pnpm types && pnpm test && pnpm build",
+    "check": "pnpm format:check && pnpm lint && pnpm types && pnpm test && pnpm demo:env:self-test && pnpm demo:smoke && pnpm build",
+    "demo:env:self-test": "node scripts/hermetic-demo-env.mjs",
+    "demo:smoke": "node scripts/smoke-local-demo.mjs",
     "dev": "PUBLIC_API_ORIGIN=http://localhost:8787 pnpm --parallel --filter @litemcp/server --filter @litemcp/web dev",
     "dev:server": "pnpm --filter @litemcp/server dev",
     "dev:web": "pnpm --filter @litemcp/web dev",

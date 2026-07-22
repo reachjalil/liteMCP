@@ -264,6 +264,12 @@ if (
 if (!JSON.stringify(ci.jobs?.["workflow-policy"]).includes("pnpm ci:policy")) {
   fail("ci.yml", "workflow policy job must run the complete pnpm ci:policy gate");
 }
+if (!JSON.stringify(ci.jobs?.test).includes("pnpm demo:smoke")) {
+  fail("ci.yml", "test job must run the real loopback governed-endpoint proof");
+}
+if (!JSON.stringify(ci.jobs?.test).includes("pnpm demo:env:self-test")) {
+  fail("ci.yml", "test job must prove the demo child environment is hermetic");
+}
 if (
   !JSON.stringify(ci.jobs?.["managed-cloud-wrangler"]).includes(
     "managed-cloud:auth-migration-window -- --self-test"

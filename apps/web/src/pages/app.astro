@@ -4,6 +4,7 @@ import "../styles/global.css";
 
 const apiBaseUrl = import.meta.env.PUBLIC_API_ORIGIN ?? import.meta.env.API_ORIGIN ?? "";
 const defaultDemoMode = import.meta.env.LITEMCP_DEMO_MODE === "true";
+const demoModeAvailable = defaultDemoMode;
 ---
 
 <!doctype html>
@@ -25,7 +26,12 @@ const defaultDemoMode = import.meta.env.LITEMCP_DEMO_MODE === "true";
   </head>
   <body>
     <a class="skip-link" href="#console-content">Skip to console content</a>
-    <ConsoleApp client:only="react" apiBaseUrl={apiBaseUrl} defaultDemoMode={defaultDemoMode} />
+    <ConsoleApp
+      client:only="react"
+      apiBaseUrl={apiBaseUrl}
+      defaultDemoMode={defaultDemoMode}
+      demoModeAvailable={demoModeAvailable}
+    />
     <noscript>This control plane requires JavaScript to load and mutate API data.</noscript>
   </body>
 </html>

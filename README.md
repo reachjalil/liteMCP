@@ -113,7 +113,18 @@ LITEMCP_DEMO_MODE=true pnpm dev
 
 Open [http://localhost:4321](http://localhost:4321), then choose **Open console**.
 The demo is visibly labeled and sends fixed `org_demo` authorization headers;
-it is disabled by default in production configurations.
+it is disabled by default in production configurations, where the demo toggle
+is not rendered.
+
+To prove the governed endpoint without keeping two terminals open, run:
+
+```bash
+pnpm demo:smoke
+```
+
+This starts a real loopback Node server, asserts filtered discovery, builtin and
+remote execution, hidden denial, approval pause/resume, redacted audit evidence,
+activation semantics, and revocation, then always cleans up the server.
 
 Agent configuration is generated from the reviewed `.harness` source for both
 Codex (`.agents`) and Claude (`.claude`). On a fresh checkout, or after pulling
@@ -145,17 +156,17 @@ The available profiles focus agents on security, deployment, release,
 observability, identity, MCP compatibility, or fast vertical-slice iteration.
 The selector `.harnessProfile` is local and intentionally not committed.
 
-In another terminal, prove that two different upstream transports are exposed
-through one scoped endpoint:
+The same proof can be run manually against the interactive server:
 
 ```bash
 pnpm --filter @litemcp/example-local-composition dev
 ```
 
-The example creates a ten-minute employee session, negotiates MCP, lists the
-policy-filtered catalog, calls the `sum` alias, and calls
-`finance.list_invoices`. A direct attempt to call the hidden refund tool is
-denied and audited by the gateway tests.
+The example creates scoped employee and finance sessions, negotiates MCP, lists
+the policy-filtered catalog, calls both transports, denies a hidden tool, pauses
+and resumes an approval-gated action, checks redacted audit evidence, and proves
+session revocation. This is repository wire evidence, not named-client
+certification.
 
 Useful API surfaces:
 

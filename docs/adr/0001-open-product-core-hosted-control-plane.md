@@ -27,7 +27,8 @@ production evidence.
 3. A separately maintained proprietary sibling owns the operated hosted
    service: production infrastructure and secrets, billing and metering,
    service plans, fleet and managed-client operations, commercial support
-   grants and entitlements, SLAs, on-call response, and compliance operations.
+   grants and entitlements, design-partner intake and applicant data, SLAs,
+   on-call response, and compliance operations.
 4. Dependencies are one-way. The proprietary sibling may consume released or
    checked-out public product code; public product builds and runtime paths may
    not depend on the sibling.

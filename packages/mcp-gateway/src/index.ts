@@ -1023,13 +1023,6 @@ export class McpGateway {
             "INTERNAL_ERROR",
             dispatchAudit
           );
-          await this.options.platform.recordActivationEvent(
-            params.tenantId,
-            "first_tool_call",
-            session.subject.id,
-            { toolName: resolved.canonicalName },
-            true
-          );
         } catch (error) {
           console.error("[litemcp] execution blocked because audit is unavailable", {
             requestId: params.requestId,
@@ -1124,6 +1117,19 @@ export class McpGateway {
             result.isError ? "TOOL_REPORTED_ERROR" : undefined,
             terminalUsage?.auditReceipt ?? resolved.auditReceipt
           );
+        }
+        if (!result.isError) {
+          // Activation is best-effort product telemetry and is meaningful only
+          // after the tool has returned a successful result.
+          await this.options.platform
+            .recordActivationEvent(
+              params.tenantId,
+              "first_tool_call",
+              session.subject.id,
+              { toolName: resolved.canonicalName },
+              true
+            )
+            .catch(() => null);
         }
         return finish(200, resultResponse(id, result));
       } catch (error) {

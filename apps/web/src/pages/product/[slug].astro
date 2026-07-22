@@ -26,8 +26,8 @@ const { page } = Astro.props;
     signal={`${page.stage} · ${page.signal}`}
   >
     <Fragment slot="actions">
-      <a class="button button--primary button--large" href="/app">Open console</a>
-      <a class="button button--large" href="/docs">Read documentation</a>
+      <a class="button button--primary button--large" href="/docs/getting-started#five-minute-proof">Run the local proof</a>
+      <a class="button button--large" href="/design-partners">Qualify a pilot</a>
     </Fragment>
   </PageHero>
 
@@ -95,12 +95,12 @@ const { page } = Astro.props;
   <section class="content-section content-section--tight">
     <div class="shell cta-panel">
       <div>
-        <h2>Evaluate locally or inspect either deployment target.</h2>
-        <p>Both paths use the complete public product core. Managed cloud adds private operated-service tooling, while self-hosting remains independent and call-home-free.</p>
+        <h2>Evaluate the tested local slice before choosing a deployment target.</h2>
+        <p>The public product core remains self-hostable and call-home-free. Managed cloud is an invite-only operated-service track; neither target has completed production acceptance.</p>
       </div>
       <div class="cta-panel__actions">
-        <a class="button button--primary" href="/cloud">Managed cloud preview</a>
-        <a class="button" href="/docs/self-hosting">Kubernetes preview</a>
+        <a class="button button--primary" href="/design-partners">Review pilot fit</a>
+        <a class="button" href="/docs/self-hosting">Inspect self-hosting evidence</a>
       </div>
     </div>
   </section>

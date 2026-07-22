@@ -3,56 +3,57 @@ import PageHero from "../components/PageHero.astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
 ---
 
-<SiteLayout title="Pricing" description="LiteMCP Composer is complete Apache-2.0 software. The managed-cloud preview is currently free under published quotas; future hosted plans will price operated capacity and support.">
+<SiteLayout title="Pricing" description="LiteMCP Composer self-hosting is Apache-2.0 and call-home-free. Managed-cloud and design-partner commercial terms are invite-only and scoped after technical qualification; no public production plan is available yet.">
   <PageHero
     eyebrow="Pricing"
-    title="Open product. Optional operated service."
-    description="Evaluate and run the complete Apache-2.0 product today. The managed-cloud preview is currently free under published quotas; future hosted plans will cover operated capacity, reliability, and support once their terms are published."
-    signal="Pre-1.0 product and service model"
+    title="Free to self-host. Pilot terms follow technical fit."
+    description="The public distribution is Apache-2.0 and has no hosted entitlement check, commercial quota, license server, mandatory telemetry, or call-home requirement. Managed-cloud and services pricing will be published only when the corresponding commitments are real."
+    signal="Pre-1.0 · no public production plan"
   />
 
   <section class="content-section">
     <div class="shell price-grid">
       <article class="price-card">
-        <span class="price-card__label">Managed cloud · Preview</span>
-        <h2>Community-cloud preview</h2>
-        <div class="price-card__price">Free</div>
-        <p>The public preview is live with registration controlled and no availability or support commitment.</p>
+        <span class="price-card__label">Public distribution · Apache 2.0</span>
+        <h2>Self-hosted source</h2>
+        <div class="price-card__price">Free to use</div>
+        <p>Evaluate, modify, and operate the public product without a private control plane or vendor account.</p>
         <ul class="check-list">
-          <li>5 servers and 5 compositions per organization</li>
-          <li>25 active sessions</li>
-          <li>1,000 tool calls per UTC day</li>
-          <li>Configuration export in preview</li>
-          <li>No uptime, capacity, or support commitment</li>
+          <li>Governed local vertical slice with automated proof</li>
+          <li>Portable Node, Docker Compose, and Helm assets</li>
+          <li>Policy, approval, audit, and payload-free analytics</li>
+          <li>No commercial self-hosting limit or call-home</li>
+          <li>Production cluster and recovery acceptance still pending</li>
         </ul>
-        <a class="button" href="/cloud">Managed cloud details</a>
+        <a class="button" href="/docs/getting-started#five-minute-proof">Run the five-minute proof</a>
       </article>
       <article class="price-card price-card--featured">
-        <span class="price-card__label">Your infrastructure · Preview</span>
-        <h2>Self-hosted source</h2>
-        <div class="price-card__price">Free</div>
-        <p>The complete product core and deployment assets under Apache License 2.0.</p>
+        <span class="price-card__label">Design partner · Invite only</span>
+        <h2>Qualified governance pilot</h2>
+        <div class="price-card__price">Scoped after fit</div>
+        <p>Evaluate one high-risk MCP workflow against explicit technical and operating acceptance criteria.</p>
         <ul class="check-list">
-          <li>Docker images and Compose configuration</li>
-          <li>Helm chart lint/render validation</li>
-          <li>Policy and audit vertical slice</li>
-          <li>Identity federation wiring in preview</li>
-          <li>No call-home requirement</li>
+          <li>Multiple MCP servers you already control</li>
+          <li>One identity-scoped discovery and denial boundary</li>
+          <li>One exact-context approval-gated action</li>
+          <li>Customer-controlled or invite-only managed target</li>
+          <li>No automatic account, acceptance, SLA, or price</li>
         </ul>
-        <a class="button button--primary" href="/docs/self-hosting">Deployment guide</a>
+        <a class="button button--primary" href="/design-partners">Review fit and apply</a>
       </article>
       <article class="price-card">
-        <span class="price-card__label">Professional services · Planned</span>
-        <h2>On-prem support</h2>
-        <div class="price-card__price">Not published</div>
-        <p>Future engagements may be scoped for topology, environments, responsibilities, and response needs.</p>
+        <span class="price-card__label">Managed cloud · Invite only</span>
+        <h2>Operated preview</h2>
+        <div class="price-card__price">No public price</div>
+        <p>The current service track is for qualified pilots, not a generally available production subscription.</p>
         <ul class="check-list">
-          <li>Architecture and installation</li>
-          <li>Identity and vault integration</li>
-          <li>HA, backup, and upgrades</li>
-          <li>Future security and support terms</li>
+          <li>Same public product core as self-hosting</li>
+          <li>Private operated-service customer controls</li>
+          <li>Applications reviewed for technical fit</li>
+          <li>No published uptime, capacity, or support commitment</li>
+          <li>Current end-to-end service acceptance pending</li>
         </ul>
-        <a class="button" href="/enterprise">Service scope</a>
+        <a class="button" href="/cloud">Inspect service status</a>
       </article>
     </div>
   </section>
@@ -61,12 +62,12 @@ import SiteLayout from "../layouts/SiteLayout.astro";
     <div class="shell split-layout">
       <div class="split-layout__aside">
         <p class="eyebrow">Plain-language model</p>
-        <h2>Hosted plans pay for an operated service, not permission to self-host.</h2>
+        <h2>A future hosted price will pay for operated responsibility, not permission to use the product.</h2>
       </div>
       <ul class="principle-list">
-        <li><span>01</span><div><strong>Managed cloud is currently a free preview</strong><p>Preview quotas are published and enforced. Future paid plans, capacity commitments, and SLAs will apply only after separate service terms are published.</p></div></li>
-        <li><span>02</span><div><strong>Self-hosting is independently operable</strong><p>The public distribution has no hosted entitlement check, mandatory call-home path, or commercial quota by default; operators may set local governance limits.</p></div></li>
-        <li><span>03</span><div><strong>Services buy operations and responsibility</strong><p>Future contracts can cover managed capacity, human work, release support, escalation, and response—not access to a secret product binary.</p></div></li>
+        <li><span>01</span><div><strong>No placeholder price masquerades as validation</strong><p>Pilot and managed-cloud terms are scoped only after the workflow, deployment target, responsibilities, and acceptance criteria are understood.</p></div></li>
+        <li><span>02</span><div><strong>Self-hosting remains independently operable</strong><p>The public distribution has no hosted entitlement check, mandatory call-home path, or commercial quota by default; operators may set their own governance limits.</p></div></li>
+        <li><span>03</span><div><strong>Future service terms must name the responsibility</strong><p>Any paid plan must make capacity, environments, support, security response, upgrades, and reliability commitments explicit instead of implying them here.</p></div></li>
       </ul>
     </div>
   </section>

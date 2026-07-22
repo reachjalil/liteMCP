@@ -325,7 +325,11 @@ export const createServerRuntime = async (
   const insecureDev = booleanEnv(environment.LITEMCP_INSECURE_DEV, false);
   const localDevelopment = demoMode || insecureDev;
   const signupsEnabled = booleanEnv(environment.SIGNUPS_ENABLED, localDevelopment);
-  const publicOrigin = environment.API_ORIGIN ?? "http://localhost:8787";
+  const publicOrigin =
+    environment.API_ORIGIN ??
+    (localDevelopment
+      ? `http://127.0.0.1:${environment.PORT ?? "8787"}`
+      : "http://localhost:8787");
   const webOrigins = splitList(environment.WEB_ORIGIN);
   if (webOrigins.length === 0) webOrigins.push("http://localhost:4321");
   const emailSender = createEmailSender(environment);

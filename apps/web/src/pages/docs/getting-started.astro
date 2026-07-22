@@ -4,82 +4,92 @@ import DocPageLayout from "../../layouts/DocPageLayout.astro";
 
 <DocPageLayout
   title="Getting started"
-  description="Run LiteMCP Composer locally and create a governed composition backed by real control-plane APIs."
+  description="Run a test-backed LiteMCP governed-endpoint proof locally, then inspect the demo control plane without relying on a hosted account."
   currentPath="/docs/getting-started"
 >
   <div class="callout">
     <strong>Development status</strong>
-    <p>LiteMCP Composer is in early open-source development. Use the explicit demo mode only with local or disposable data.</p>
+    <p>
+      LiteMCP Composer is pre-1.0. The proof below uses an ephemeral loopback server, in-memory
+      data, sandbox tools, and a fixed demo identity. It is product evidence—not production,
+      identity-provider, named-client, or deployment acceptance.
+    </p>
   </div>
 
   <h2 id="prerequisites">Prerequisites</h2>
   <ul>
     <li>Node.js 22.12 or newer</li>
-    <li>pnpm 10.30</li>
-    <li>Docker with Compose only when evaluating the packaged self-hosted stack</li>
+    <li>pnpm 10.30.2</li>
+    <li>No Docker, hosted account, private package, or external MCP server for the local proof</li>
   </ul>
 
   <h2 id="install">Install the workspace</h2>
   <pre><code>git clone https://github.com/reachjalil/liteMCP.git
 cd liteMCP
+corepack enable
 pnpm install --frozen-lockfile</code></pre>
-  <p>
-    The source demo uses in-memory data and a fixed local-only identity. Do not expose it to a
-    shared network or treat it as an authentication test.
-  </p>
 
-  <h2 id="run">Run the local source demo</h2>
+  <h2 id="five-minute-proof">Run the five-minute governed-endpoint proof</h2>
+  <pre><code>pnpm demo:smoke</code></pre>
+  <p>
+    One command reserves a loopback port, starts the portable Node composition in explicit demo
+    mode, executes the SDK scenario against real HTTP and MCP routes, and stops the server. A
+    successful run ends with:
+  </p>
+  <pre><code>PASS real loopback MCP initialize and filtered discovery
+PASS builtin and remote governed tool execution
+PASS hidden denial and exact-context approval pause/resume
+PASS payload-free activation and redacted audit evidence
+PASS revoked session denied at the gateway boundary</code></pre>
+
+  <h3 id="proof-scenario">What the scenario exercises</h3>
+  <ol>
+    <li>An employee session initializes MCP and receives a policy-filtered tool catalog.</li>
+    <li><code>finance.issue_refund</code> is hidden, and a guessed direct call is denied before upstream dispatch.</li>
+    <li>Allowed built-in and remote tools execute, including a sandbox sum that returns <code>42</code>.</li>
+    <li>A finance session can discover the refund tool, but execution pauses for an exact-context approval.</li>
+    <li>A separate local demo administrator approves the request; one identical retry succeeds and consumes the approval.</li>
+    <li>Revocation blocks the employee session, while audit and activation records exclude the tested token, account ID, and refund reason.</li>
+  </ol>
+
+  <div class="callout">
+    <strong>Proof boundary</strong>
+    <p>
+      This validates the maintained local vertical slice. It does not establish production
+      hardening, broad MCP-client compatibility, live OIDC/SAML/SCIM behavior, upstream OAuth
+      brokering, Kubernetes runtime behavior, backup/restore, managed-cloud availability, an
+      external security review, or a compliance posture.
+    </p>
+  </div>
+
+  <h2 id="interactive-demo">Explore the local control plane</h2>
   <pre><code>LITEMCP_DEMO_MODE=true pnpm dev</code></pre>
   <p>
     The web surface defaults to <code>http://localhost:4321</code> and the management API to
     <code>http://localhost:8787</code>. The root command starts only the portable Node server and
-    Astro site; use <code>pnpm managed-cloud:dev</code> separately for the managed cloud runtime.
+    Astro site; it does not start or authenticate against the managed-cloud runtime.
+  </p>
+  <p>
+    With the command running, open the
+    <a href="http://localhost:4321/app?demo=1">local demo console</a>. Do not expose demo mode to a
+    shared network or treat its fixed identity as an authentication test.
   </p>
 
-  <h2 id="inspect">Inspect the control plane</h2>
+  <h3 id="inspect-api">Inspect the demo tenant directly</h3>
   <pre><code>curl --fail-with-body http://localhost:8787/api/v1/overview \
   -H 'x-litemcp-tenant: org_demo' \
   -H 'x-litemcp-role: finance-admin'</code></pre>
   <p>
-    Those headers are accepted only as the explicit demo identity. Production requests must
-    derive tenant membership and roles from the authenticated server session.
+    Those headers are accepted only in explicit demo mode. Production requests must derive the
+    tenant, membership, actor, roles, and authorization state from a trusted authenticated server
+    session.
   </p>
 
-  <h2 id="register">Register an upstream MCP server</h2>
-  <pre><code>{`curl --fail-with-body -X POST http://localhost:8787/api/v1/servers \\
-	  -H 'content-type: application/json' \\
-	  -H 'x-litemcp-tenant: org_demo' \\
-	  -H 'x-litemcp-role: finance-admin' \\
-  -d '{
-    "slug": "internal-docs",
-    "name": "Internal docs",
-    "description": "Read-only documentation search",
-    "transport": "streamable-http",
-    "endpoint": "https://mcp.example.net/mcp",
-    "version": "1.0.0",
-    "visibility": "private",
-    "tags": ["docs", "read-only"],
-    "tools": []
-  }'`}</code></pre>
-
-  <h2 id="compose">Create a composition</h2>
-  <p>
-    Open <a href="/app#composer">Console → Composer</a>, choose a registered server, assign a
-    namespace, and create the composition. The console posts the exact member and alias structure
-    to <code>/api/v1/compositions</code>; it does not maintain a browser-only copy.
-  </p>
-
-  <h2 id="policy">Simulate policy before issuing a session</h2>
-  <p>
-    Use <a href="/app#policy">Policy simulator</a> to test a subject, action, tool, and risk class.
-    The response explains whether execution is allowed, denied, or requires approval and identifies
-    the matching rule IDs.
-  </p>
-
-  <h2 id="next">Next steps</h2>
+  <h2 id="next">Choose the next evidence step</h2>
   <ul>
-    <li>Review <a href="/product/identity">identity and gateway sessions</a>.</li>
-    <li>Read the <a href="/security">security boundary overview</a>.</li>
-    <li>Inspect the <a href="/docs/self-hosting">Kubernetes deployment preview</a> and its remaining runtime proof.</li>
+    <li>Inspect the <a href="/security">security and evidence boundaries</a>.</li>
+    <li>Review the <a href="/docs/self-hosting">self-hosting assets and pending runtime proof</a>.</li>
+    <li>Read the <a href="https://github.com/reachjalil/liteMCP/blob/main/IMPLEMENTATION_STATUS.md">implementation evidence and acceptance gaps</a>.</li>
+    <li>If the local slice matches a real high-risk workflow, <a href="/design-partners">qualify a design-partner pilot</a>.</li>
   </ul>
 </DocPageLayout>

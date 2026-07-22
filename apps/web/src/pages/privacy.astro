@@ -3,12 +3,12 @@ import PageHero from "../components/PageHero.astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
 ---
 
-<SiteLayout title="Privacy Policy" description="How the LiteMCP Composer managed-cloud preview collects, uses, shares, and protects account, configuration, and operational data.">
+<SiteLayout title="Privacy Policy" description="How LiteMCP Composer processes design-partner applications and, for invited users, managed-cloud account, configuration, and operational data.">
   <PageHero
-    eyebrow="Legal · Managed-cloud preview"
+    eyebrow="Legal · Design-partner and managed preview"
     title="Privacy Policy"
-    description="This policy describes the hosted preview. A self-hosted operator controls its own deployment and data practices."
-    signal="Effective 21 July 2026"
+    description="This policy describes the public website, design-partner application, and invite-only hosted preview. A self-hosted operator controls its own deployment and data practices."
+    signal="Effective 22 July 2026"
   >
     <Fragment slot="actions">
       <a class="button button--primary button--large" href="/terms">Terms of Service</a>
@@ -20,18 +20,19 @@ import SiteLayout from "../layouts/SiteLayout.astro";
     <div class="shell">
       <article class="prose">
         <p>
-          This Privacy Policy applies to the LiteMCP Composer website and managed-cloud preview
-          (the “Service”). It does not control a self-hosted installation or an upstream MCP
-          server you choose to connect. The LiteMCP Composer project maintainers operate the
-          current preview; a formal commercial operator and address have not been announced.
-          The Service must not represent general availability until that controller information
-          and production retention terms are published.
+          This Privacy Policy applies to the LiteMCP Composer website, design-partner intake, and
+          invite-only managed-cloud preview (the “Service”). It does not control a self-hosted
+          installation or an upstream MCP server you choose to connect. The LiteMCP Composer
+          project maintainers operate the current preview; a formal commercial operator and
+          address have not been announced. The Service must not represent general availability
+          until that controller information and production retention terms are published.
         </p>
 
         <h2 id="data">1. Information we process</h2>
         <ul>
           <li><strong>Account data:</strong> name, email address, verification state, password credential hash, sessions, authentication factors, and recovery records.</li>
           <li><strong>Organization data:</strong> memberships, roles, invitations, identity-provider metadata, API-key metadata, and administrator actions.</li>
+          <li><strong>Design-partner application:</strong> work contact, organization and role, coarse server and user ranges, MCP clients, upstream-authentication and identity-provider categories, deployment preference, timeline, proposed sensitive workflow, consent, and privacy-notice version.</li>
           <li><strong>Product configuration:</strong> MCP server definitions, compositions, environments, policies, approvals, session metadata, and configuration exports.</li>
           <li><strong>Operational data:</strong> request identifiers, timestamps, route and outcome data, IP address and user-agent information received by authentication or infrastructure layers, rate-limit counters, security events, and audit records.</li>
           <li><strong>Communications:</strong> email delivery metadata and information you include in support, security, or design-partner messages.</li>
@@ -41,7 +42,7 @@ import SiteLayout from "../layouts/SiteLayout.astro";
           server during execution. The product is designed to avoid storing their plaintext in
           audit records; approval records use an arguments hash. Infrastructure and upstream
           behavior still require production validation, so do not send sensitive payloads to the
-          public preview.
+          managed preview.
         </p>
 
         <h2 id="purpose">2. Why we use information</h2>
@@ -50,6 +51,7 @@ import SiteLayout from "../layouts/SiteLayout.astro";
           <li>create and secure accounts, sessions, organizations, and invitations;</li>
           <li>provide composition, policy, routing, approval, audit, and export features;</li>
           <li>deliver verification, password-reset, invitation, and service emails;</li>
+          <li>qualify and coordinate a requested design-partner pilot;</li>
           <li>prevent abuse, enforce rate limits, troubleshoot failures, and protect tenants;</li>
           <li>understand preview activation and improve reliability; and</li>
           <li>comply with law and respond to valid legal requests.</li>
@@ -83,6 +85,14 @@ import SiteLayout from "../layouts/SiteLayout.astro";
         </p>
 
         <h2 id="retention">5. Retention and deletion</h2>
+        <p>
+          New design-partner applications expire after 180 days and are deleted on the next daily
+          private-data cleanup pass. Under routine operation that adds no more than one day of
+          deletion lag, but it is not an external retention SLA. The intake uses a keyed network
+          hash for hourly abuse limits, does not join it to the application, and expires that abuse
+          bucket after 48 hours under the same daily cleanup schedule. It does not retain the raw
+          network address in the application record.
+        </p>
         <p>
           We keep account and configuration data while the account or organization is active and
           as needed for security, backup, dispute, and legal purposes. The preview does not yet

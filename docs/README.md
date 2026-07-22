@@ -13,6 +13,9 @@ with the two status files before relying on any capability in production.
   plane, credential plane, and deployment topology.
 - [`mcp-native-positioning.md`](./mcp-native-positioning.md) — MCP-native
   category, differentiation, product wedge, and proof requirements.
+- [`design-partner-program.md`](./design-partner-program.md) — ideal partner,
+  four-week pilot contract, activation/retention evidence, pricing hypotheses,
+  and the gate between product proof and market proof.
 - [`feature-reference.md`](./feature-reference.md) — current capability catalog
   with Available now, Preview, Designed, and Blocked labels.
 - [`requirements-traceability.md`](./requirements-traceability.md) — stable

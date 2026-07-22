@@ -43,6 +43,19 @@ describe("portable Node runtime", () => {
     await runtime.close();
   });
 
+  it("uses its actual loopback bind origin for default demo endpoints", async () => {
+    const runtime = await createServerRuntime({
+      LITEMCP_DEMO_MODE: "true",
+      PORT: "9123",
+    });
+    const response = await mintDemoSession(runtime);
+    expect(response.status).toBe(201);
+    expect((await response.json()).data.endpoint).toBe(
+      "http://127.0.0.1:9123/mcp/org_demo/company-tools"
+    );
+    await runtime.close();
+  });
+
   it("fails closed at startup when persistent storage is not configured", async () => {
     await expect(createServerRuntime({})).rejects.toThrow("MONGODB_URI is required");
   });

@@ -46,10 +46,14 @@ required to run LiteMCP Composer as an operated offering:
 | Service economics | Billing, metering, plans, invoices, and hosted-service entitlements |
 | Fleet and client operations | Multi-deployment fleet management, managed upgrades, client operations, and customer-specific automation |
 | Service assurance | Commercial support grants and entitlements, SLA enforcement, compliance operations, and service-specific reporting |
+| Commercial intake | Design-partner applications, lead qualification, applicant contact data, and the staff review workflow |
 
 Those systems may consume the public product. The public product must not
 depend on them. Buying the hosted service or support changes the service
 relationship; it does not unlock, relicense, or complete the Apache product.
+The public website may describe the design-partner program and its submission
+schema, but self-hosted product behavior must never depend on that commercial
+intake service.
 
 ## Historical Apache grants
 

@@ -300,6 +300,167 @@ describe("McpGateway", () => {
     expect(failures).toContain("sink");
   });
 
+  it("records first-tool activation only after a successful tool result", async () => {
+    const { gateway, platform, token } = await setup("employee");
+    const firstToolEvents = async () =>
+      (await platform.listActivationEvents("org_demo")).filter(
+        (event) => event.name === "first_tool_call"
+      );
+
+    expect(await firstToolEvents()).toHaveLength(0);
+    const succeeded = await gateway.handle({
+      tenantId: "org_demo",
+      compositionSlug: "company-tools",
+      authorization: `Bearer ${token}`,
+      requestId: "request_first_tool_success",
+      body: {
+        jsonrpc: "2.0",
+        id: 105,
+        method: "tools/call",
+        params: { name: "sum", arguments: { a: 20, b: 22 } },
+      },
+    });
+
+    expect(succeeded.status).toBe(200);
+    expect(await firstToolEvents()).toMatchObject([
+      { metadata: { toolName: "math.add" } },
+    ]);
+
+    await gateway.handle({
+      tenantId: "org_demo",
+      compositionSlug: "company-tools",
+      authorization: `Bearer ${token}`,
+      requestId: "request_second_tool_success",
+      body: {
+        jsonrpc: "2.0",
+        id: 106,
+        method: "tools/call",
+        params: {
+          name: "finance.list_invoices",
+          arguments: { accountId: "acct_1" },
+        },
+      },
+    });
+    expect(await firstToolEvents()).toHaveLength(1);
+  });
+
+  it("does not record first-tool activation for a tool-reported error", async () => {
+    const { gateway, platform, token } = await setup(
+      "employee",
+      async () =>
+        new Response(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: "upstream",
+            result: {
+              content: [{ type: "text", text: "sandbox failure" }],
+              isError: true,
+            },
+          }),
+          { headers: { "content-type": "application/json" } }
+        )
+    );
+    const response = await gateway.handle({
+      tenantId: "org_demo",
+      compositionSlug: "company-tools",
+      authorization: `Bearer ${token}`,
+      requestId: "request_tool_reported_error",
+      body: {
+        jsonrpc: "2.0",
+        id: 107,
+        method: "tools/call",
+        params: {
+          name: "finance.list_invoices",
+          arguments: { accountId: "acct_1" },
+        },
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(JSON.stringify(response.body)).toContain('"isError":true');
+    expect(
+      (await platform.listActivationEvents("org_demo")).filter(
+        (event) => event.name === "first_tool_call"
+      )
+    ).toHaveLength(0);
+  });
+
+  it("does not activate when upstream execution fails", async () => {
+    const { gateway, platform, token, upstreamCalls } = await setup(
+      "employee",
+      async () => {
+        throw new Error("upstream unavailable");
+      }
+    );
+    const response = await gateway.handle({
+      tenantId: "org_demo",
+      compositionSlug: "company-tools",
+      authorization: `Bearer ${token}`,
+      requestId: "request_upstream_failed_before_activation",
+      body: {
+        jsonrpc: "2.0",
+        id: 108,
+        method: "tools/call",
+        params: {
+          name: "finance.list_invoices",
+          arguments: { accountId: "acct_1" },
+        },
+      },
+    });
+
+    expect(response.status).toBe(502);
+    expect(upstreamCalls()).toBe(2);
+    expect(response.body).toMatchObject({ error: { code: -32002 } });
+    expect(
+      (await platform.listActivationEvents("org_demo")).filter(
+        (event) => event.name === "first_tool_call"
+      )
+    ).toHaveLength(0);
+  });
+
+  it("never lets unavailable activation telemetry affect a successful call", async () => {
+    const { gateway, platform, token, usageEvents } = await setup("employee");
+    let activationAttempts = 0;
+    platform.recordActivationEvent = async () => {
+      activationAttempts += 1;
+      throw new Error("activation telemetry unavailable");
+    };
+    usageEvents.length = 0;
+
+    const response = await gateway.handle({
+      tenantId: "org_demo",
+      compositionSlug: "company-tools",
+      authorization: `Bearer ${token}`,
+      requestId: "request_activation_down",
+      body: {
+        jsonrpc: "2.0",
+        id: 109,
+        method: "tools/call",
+        params: { name: "sum", arguments: { a: 2, b: 3 } },
+      },
+    });
+
+    expect(activationAttempts).toBe(1);
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      result: { structuredContent: { sum: 5 } },
+    });
+    expect(usageEvents).toHaveLength(1);
+    expect(usageEvents[0]).toMatchObject({
+      eventType: "call",
+      status: "succeeded",
+      tool: "math.add",
+    });
+    expect(
+      (await platform.listAudit("org_demo")).some(
+        (event) =>
+          event.requestId === "request_activation_down" &&
+          event.type === "execution.completed" &&
+          event.outcome === "succeeded"
+      )
+    ).toBe(true);
+  });
+
   it("denies a hidden tool even when its name is guessed", async () => {
     const { gateway, token, usageEvents } = await setup("employee");
     usageEvents.length = 0;
@@ -368,6 +529,11 @@ describe("McpGateway", () => {
 
     expect(response.status).toBe(403);
     expect(upstreamCalls()).toBe(0);
+    expect(
+      (await platform.listActivationEvents("org_demo")).filter(
+        (event) => event.name === "first_tool_call"
+      )
+    ).toHaveLength(0);
   });
 
   it("pauses approval-gated calls without executing upstream", async () => {

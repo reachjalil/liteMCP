@@ -9,7 +9,12 @@ import {
   UsageEvent,
   usageEventSchema,
 } from "@litemcp/contracts";
-import { MemoryDocumentStore } from "@litemcp/storage";
+import {
+  type CollectionName,
+  MemoryDocumentStore,
+  type PutOptions,
+  type StoredDocument,
+} from "@litemcp/storage";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -29,7 +34,60 @@ const employee: Subject = {
   claims: {},
 };
 
+class ActivationFailingStore extends MemoryDocumentStore {
+  override async put<T extends StoredDocument>(
+    tenantId: string,
+    collection: CollectionName,
+    document: T,
+    options?: PutOptions
+  ): Promise<T> {
+    if (collection === "activation-events") {
+      throw new Error("activation telemetry unavailable");
+    }
+    return super.put(tenantId, collection, document, options);
+  }
+}
+
 describe("PlatformService vertical slice", () => {
+  it("keeps lifecycle operations fail-open when activation storage is unavailable", async () => {
+    const failures: Array<{ operation: "read" | "write"; errorName: string }> = [];
+    const service = new PlatformService(new ActivationFailingStore(), {
+      activationFailureReporter: (failure) => failures.push(failure),
+    });
+    await expect(service.ensureDemoTenant()).resolves.toMatchObject({
+      id: "org_demo",
+    });
+    const issued = await service.createSession(
+      "org_demo",
+      {
+        compositionId: "composition_company",
+        environmentId: "env_production",
+        subject: employee,
+        approvedClients: ["test"],
+        expiresInSeconds: 600,
+      },
+      employee.id,
+      "request_activation_failure",
+      "https://gateway.example.net"
+    );
+
+    expect(issued.session.subject.id).toBe(employee.id);
+    await expect(
+      service.recordActivationEvent(
+        "org_demo",
+        "first_tool_call",
+        employee.id,
+        {},
+        true
+      )
+    ).resolves.toBeNull();
+    await expect(service.listActivationEvents("org_demo")).resolves.toEqual([]);
+    expect(failures).toHaveLength(2);
+    expect(failures).toEqual(
+      expect.arrayContaining([{ operation: "write", errorName: "Error" }])
+    );
+  });
+
   it("binds initialize attribution first-write-wins without changing authorization revision", async () => {
     const store = new MemoryDocumentStore();
     const service = new PlatformService(store);

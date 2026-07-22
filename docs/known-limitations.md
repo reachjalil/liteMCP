@@ -255,7 +255,9 @@ production-ready enterprise release. This list is intentionally conservative.
   checked in. Application quotas and Better Auth database rate limits do not
   substitute for an edge abuse-control layer.
 - Managed cloud demo mode is guarded to loopback `PUBLIC_ORIGIN`; Node demo mode
-  defaults off and binds loopback unless an explicit unsafe override is set.
+  defaults off, binds loopback unless an explicit unsafe override is set, and
+  now uses the matching `127.0.0.1` origin for its generated demo endpoint. The
+  web console does not render the demo-mode switch in non-demo builds.
 - Tool JSON Schemas use an isolated validator, reject external references, and
   validate standard formats. The supported-schema compatibility surface still
   needs broader fuzzing and resource limits for pathological schemas.

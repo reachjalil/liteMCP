@@ -49,9 +49,12 @@ supported one.
 | Streaming/resumability | Full Streamable HTTP streaming and resumability are not implemented; `legacy-sse` is not standards-faithful SSE | Blocked |
 | MCP OAuth | Protected-resource and authorization-server metadata, bounded dynamic client registration, authenticated same-origin consent, PKCE authorization code, 15-minute bearer access, explicit optional `offline_access`, rotating refresh families, token revocation, and MCP challenges are implemented | Wire-only; no real-client acceptance proof |
 
-Repository tests plus `scripts/smoke-managed-cloud.sh` can exercise authenticated
-`initialize`, `tools/list`, and an explicitly selected read-only `tools/call`.
-That smoke is a wire check, not named-client certification.
+`pnpm demo:smoke` starts a real loopback portable Node server and exercises
+authenticated initialize, filtered discovery, builtin and remote calls, hidden
+denial, approval pause/resume, audit redaction, and revocation through the
+TypeScript SDK. Repository tests and `scripts/smoke-managed-cloud.sh` cover
+additional local and deployment wire paths. These are wire checks, not
+named-client certification.
 
 ## Recording a compatibility run
 

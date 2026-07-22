@@ -5,8 +5,8 @@ import SiteLayout from "../layouts/SiteLayout.astro";
 
 const commitments = [
   [
-    "A complete open product",
-    "Gateway, registry, policy, identity, audit, portability, and self-hosted deployment capabilities stay public.",
+    "A complete public product boundary",
+    "Gateway, registry, policy, identity, audit, analytics, portability, and self-hosted deployment capabilities stay public as their pre-1.0 implementations mature.",
   ],
   [
     "No license server",
@@ -31,17 +31,17 @@ const commitments = [
 ];
 ---
 
-<SiteLayout title="Open source" description="LiteMCP Composer is a complete Apache-2.0 MCP composition control plane. Its self-hosted distribution remains call-home-free; the optional operated service has a separate private control plane.">
+<SiteLayout title="Open source" description="LiteMCP Composer defines its complete self-hosted product boundary under Apache 2.0. The implementation is pre-1.0 and call-home-free; the optional operated service has a separate private control plane.">
   <PageHero
     eyebrow="Open-source commitment"
     title="The product stays open. The operated service is separate."
-    description="LiteMCP Composer is licensed under Apache 2.0. Security, identity, policy, audit, portability, high-availability, and on-prem capabilities mature in public. Private code is limited to operating our hosted service: customer lifecycle, billing, support access, provisioning, and fleet releases."
-    signal="Complete open product · optional managed operations"
+    description="LiteMCP Composer is licensed under Apache 2.0. Security, identity, policy, audit, analytics, portability, high-availability, and on-prem capabilities mature in public. Private code is limited to operating our hosted service: customer lifecycle, billing, support access, provisioning, and fleet releases."
+    signal="Complete public boundary · pre-1.0 implementation"
   >
     <Fragment slot="actions">
       <a class="button button--primary button--large" href="https://github.com/reachjalil/liteMCP">View GitHub ↗</a>
-      <a class="button button--large" href="/docs/getting-started">Run it locally</a>
-      <a class="button button--large" href="/changelog">Release policy</a>
+      <a class="button button--large" href="/docs/getting-started#five-minute-proof">Run the proof locally</a>
+      <a class="button button--large" href="https://github.com/reachjalil/liteMCP/blob/main/docs/release-and-lts-policy.md">Release policy ↗</a>
     </Fragment>
   </PageHero>
 
@@ -49,8 +49,8 @@ const commitments = [
     <div class="shell">
       <SectionHeader
         eyebrow="Project covenant"
-        title="Portable by architecture and by policy."
-        description="The self-hosted product is independently operable without private code, a license server, a cloud account, or a hosted-service dependency."
+        title="Portable by architecture and policy—not by maturity claims."
+        description="The self-hosted product is independently operable without private code, a license server, a cloud account, or a hosted-service dependency. Live Kubernetes, recovery, and cross-target exit tests are still pending."
       />
       <div class="feature-grid">
         {commitments.map(([title, description], index) => (

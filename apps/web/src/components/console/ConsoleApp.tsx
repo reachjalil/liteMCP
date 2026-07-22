@@ -53,6 +53,7 @@ type ConsoleArea =
 type ConsoleAppProps = {
   apiBaseUrl?: string;
   defaultDemoMode?: boolean;
+  demoModeAvailable?: boolean;
 };
 
 type Notice = {
@@ -99,7 +100,8 @@ const readInitialArea = (): ConsoleArea => {
   return consoleAreas.has(hash) ? hash : "overview";
 };
 
-const readInitialDemoMode = (defaultDemoMode: boolean) => {
+const readInitialDemoMode = (defaultDemoMode: boolean, demoModeAvailable: boolean) => {
+  if (!demoModeAvailable) return false;
   if (typeof window === "undefined") return defaultDemoMode;
   const query = new URLSearchParams(window.location.search).get("demo");
   if (query === "1" || query === "true") return true;
@@ -319,6 +321,7 @@ const EmptyState = ({
 export function ConsoleApp({
   apiBaseUrl = "",
   defaultDemoMode = false,
+  demoModeAvailable = defaultDemoMode,
 }: ConsoleAppProps) {
   // Keep the server and first client render identical. URL-derived state is applied
   // after hydration so bookmarked console areas never trigger a hydration mismatch.
@@ -470,9 +473,9 @@ export function ConsoleApp({
 
   useEffect(() => {
     setArea(readInitialArea());
-    setDemoMode(readInitialDemoMode(defaultDemoMode));
+    setDemoMode(readInitialDemoMode(defaultDemoMode, demoModeAvailable));
     setHydrated(true);
-  }, [defaultDemoMode]);
+  }, [defaultDemoMode, demoModeAvailable]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -486,6 +489,7 @@ export function ConsoleApp({
   }, []);
 
   const toggleDemoMode = () => {
+    if (!demoModeAvailable) return;
     const next = !demoMode;
     setDemoMode(next);
     setNotice({
@@ -595,18 +599,22 @@ export function ConsoleApp({
               <code>x-litemcp-role: finance-admin</code>. This is not production
               authentication.
             </span>
-            <button type="button" onClick={toggleDemoMode}>
-              Exit demo mode
-            </button>
+            {demoModeAvailable ? (
+              <button type="button" onClick={toggleDemoMode}>
+                Exit demo mode
+              </button>
+            ) : null}
           </div>
         ) : (
           <div className="console-auth-banner" role="note">
             <span>
               Authenticated mode: tenancy and roles must come from the server session.
             </span>
-            <button type="button" onClick={toggleDemoMode}>
-              Use local demo identity
-            </button>
+            {demoModeAvailable ? (
+              <button type="button" onClick={toggleDemoMode}>
+                Use local demo identity
+              </button>
+            ) : null}
           </div>
         )}
 
@@ -2048,7 +2056,7 @@ function IdentityArea({
     environmentId: "",
     subjectType: "user" as "user" | "service-principal",
     subjectId: "demo-user",
-    roles: "developer",
+    roles: "employee",
     groups: "",
     approvedClients: "codex",
     expiresInSeconds: 3600,
@@ -3318,7 +3326,7 @@ function PolicyArea({
     policyId: "",
     subjectType: "user" as "user" | "service-principal",
     subjectId: "demo-user",
-    roles: "developer",
+    roles: "employee",
     groups: "",
     action: "execute" as "discover" | "execute",
     toolName: "docs.search",

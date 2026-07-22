@@ -3,12 +3,12 @@ import PageHero from "../components/PageHero.astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
 ---
 
-<SiteLayout title="Terms of Service" description="Terms governing use of the LiteMCP Composer managed-cloud preview; self-hosted Apache-2.0 software remains governed by its open-source license.">
+<SiteLayout title="Terms of Service" description="Terms governing invited use of the LiteMCP Composer managed-cloud preview; a design-partner application is not service acceptance, and self-hosted software remains governed by Apache 2.0.">
   <PageHero
-    eyebrow="Legal · Managed-cloud preview"
+    eyebrow="Legal · Invite-only managed preview"
     title="Terms of Service"
     description="These terms govern the hosted LiteMCP Composer preview. They do not replace the Apache-2.0 license for software you run yourself."
-    signal="Effective 21 July 2026"
+    signal="Effective 22 July 2026"
   >
     <Fragment slot="actions">
       <a class="button button--primary button--large" href="/privacy">Privacy policy</a>
@@ -26,13 +26,19 @@ import SiteLayout from "../layouts/SiteLayout.astro";
           Service, you agree to these Terms. If you use the Service for an organization, you
           confirm that you may accept these Terms for that organization.
         </p>
+        <p>
+          Submitting a design-partner application does not create an account, accept these Terms
+          on behalf of an organization, guarantee an invitation, place an order, or create a paid
+          service, SLA, or production commitment.
+        </p>
 
         <h2 id="preview">1. Preview status</h2>
         <p>
-          The Service is an early public preview. Registration may be paused, features may
-          change, and no uptime, support, regional-hosting, retention, or recovery service
-          level is promised. Do not rely on the preview for production, safety-critical, or
-          regulated workloads. Current limitations are published with the source repository.
+          The Service is an invite-only pre-1.0 preview. Self-service registration is disabled by
+          default, access may be paused, features may change, and no uptime, support,
+          regional-hosting, retention, or recovery service level is promised. Do not rely on the
+          preview for production, safety-critical, or regulated workloads. Current limitations are
+          published with the source repository.
         </p>
 
         <h2 id="accounts">2. Accounts and organizations</h2>
@@ -94,7 +100,7 @@ import SiteLayout from "../layouts/SiteLayout.astro";
 
         <h2 id="warranty">7. Disclaimers and responsibility</h2>
         <p>
-          To the fullest extent permitted by law, the free preview is provided “as is” and “as
+          To the fullest extent permitted by law, the invite-only preview is provided “as is” and “as
           available,” without warranties of availability, fitness, non-infringement, or error-free
           operation. Nothing in these Terms excludes liability or consumer rights that cannot
           lawfully be excluded. No paid plan or contractual SLA is offered under these preview

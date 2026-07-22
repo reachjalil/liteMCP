@@ -2,50 +2,53 @@
 import PageHero from "../components/PageHero.astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
 
-const updates = [
+const engineeringRecords = [
   [
     "Architecture",
-    "Why one MCP endpoint needs separate control and data planes",
-    "A technical note on stable client contracts, identity, policy, routing, and portable deployment.",
+    "Control and data plane architecture",
+    "Read the maintained component boundaries, dependency direction, runtime compositions, and portability constraints.",
+    "https://github.com/reachjalil/liteMCP/blob/main/ARCHITECTURE.md",
   ],
   [
     "Security",
-    "Policy must shape discovery and execution",
-    "The reason a deny decision has to apply before a capability is listed and again before it runs.",
+    "MCP threat model",
+    "Review tenant, identity, policy, credential, egress, approval, audit, and analytics trust boundaries with current mitigations and gaps.",
+    "https://github.com/reachjalil/liteMCP/blob/main/docs/threat-model.md",
   ],
   [
-    "Operations",
-    "What complete self-hosting actually requires",
-    "Beyond a Helm install: preflight, identity, vaults, backup, upgrade, rollback, and diagnostics.",
+    "Evidence",
+    "Implementation status",
+    "Follow reproducible proof, acceptance scenarios, maturity labels, and the work that remains before production-readiness claims.",
+    "https://github.com/reachjalil/liteMCP/blob/main/IMPLEMENTATION_STATUS.md",
   ],
 ];
 ---
 
-<SiteLayout title="Updates" description="LiteMCP Composer engineering updates, architecture notes, security decisions, and release operations.">
+<SiteLayout title="Engineering records" description="Maintained LiteMCP Composer architecture, security, and implementation evidence in the public repository.">
   <PageHero
-    eyebrow="Engineering updates"
-    title="Architecture, security, and operations in public."
-    description="This publication will document the decisions behind LiteMCP Composer, compatibility findings, release evidence, security changes, and the work required to operate a portable MCP control plane."
-    signal="Evidence before announcement"
+    eyebrow="Engineering records"
+    title="Read maintained evidence, not an editorial queue."
+    description="LiteMCP engineering decisions, security boundaries, acceptance results, and known limitations live beside the code so claims can link to exact implementations and tests."
+    signal="Repository-backed · current maturity labeled"
     compact
   />
 
   <section class="content-section">
     <div class="shell blog-grid">
-      {updates.map(([category, title, description]) => (
-        <article class="blog-card">
-          <div class="blog-card__meta"><span>{category}</span><span>Editorial queue</span></div>
+      {engineeringRecords.map(([category, title, description, href]) => (
+        <a class="blog-card" href={href}>
+          <div class="blog-card__meta"><span>{category}</span><span>Maintained source ↗</span></div>
           <h2>{title}</h2>
           <p>{description}</p>
-        </article>
+        </a>
       ))}
     </div>
   </section>
 
   <section class="content-section content-section--tight">
     <div class="shell legal-note">
-      The update structure is live; individual posts are not presented as published until their
-      technical review and evidence links are complete.
+      There is no publication cadence or newsletter commitment. Release changes are recorded in
+      the repository with their implementation and validation evidence.
     </div>
   </section>
 </SiteLayout>

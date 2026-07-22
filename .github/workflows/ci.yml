@@ -74,6 +74,10 @@ jobs:
       - name: Exercise the guarded MongoDB auth-upgrade planner
         run: pnpm auth:migrate:mongodb:self-test
       - run: pnpm test
+      - name: Prove the local demo cannot inherit external integrations
+        run: pnpm demo:env:self-test
+      - name: Prove the governed endpoint over a real loopback server
+        run: pnpm demo:smoke
 
   python-sdk:
     name: Python SDK tests

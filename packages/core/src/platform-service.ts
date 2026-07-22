@@ -631,6 +631,10 @@ export type PlatformServiceOptions = {
   quotaResolver?: PlatformQuotaResolver;
   analyticsRecorder?: FailOpenAnalyticsRecorder;
   analyticsEnabled?: boolean;
+  activationFailureReporter?: (failure: {
+    operation: "read" | "write";
+    errorName: string;
+  }) => void;
   approvalNotifier?: (notification: {
     tenantId: string;
     approvalId: string;
@@ -647,6 +651,9 @@ export class PlatformService {
   readonly #quotaResolver?: PlatformQuotaResolver;
   readonly #analyticsRecorder?: FailOpenAnalyticsRecorder;
   readonly #analyticsEnabled: boolean;
+  readonly #activationFailureReporter: NonNullable<
+    PlatformServiceOptions["activationFailureReporter"]
+  >;
   readonly #sessionAttributionCache = new Map<string, SessionClientInfo>();
   readonly #approvalNotifier?: PlatformServiceOptions["approvalNotifier"];
 
@@ -660,6 +667,11 @@ export class PlatformService {
     this.#analyticsRecorder = options.analyticsRecorder;
     this.#analyticsEnabled =
       options.analyticsEnabled ?? Boolean(options.analyticsRecorder);
+    this.#activationFailureReporter =
+      options.activationFailureReporter ??
+      ((failure) => {
+        console.error("[litemcp] activation telemetry unavailable", failure);
+      });
     this.#approvalNotifier = options.approvalNotifier;
   }
 
@@ -1648,26 +1660,42 @@ export class PlatformService {
     metadata: Record<string, unknown> = {},
     dedupe = false
   ) {
-    if (
-      dedupe &&
-      (await this.listActivationEvents(tenantId)).some((event) => event.name === name)
-    ) {
+    let operation: "read" | "write" = "read";
+    try {
+      if (
+        dedupe &&
+        (await this.listActivationEvents(tenantId)).some((event) => event.name === name)
+      ) {
+        return null;
+      }
+      const now = nowIso();
+      const event: ActivationEvent = {
+        id: randomId("activation"),
+        tenantId,
+        name,
+        actorId,
+        metadata: redactSecrets(metadata) as Record<string, unknown>,
+        createdAt: now,
+        updatedAt: now,
+        revision: 1,
+      };
+      operation = "write";
+      return await this.store.put(tenantId, "activation-events", event, {
+        expectedRevision: null,
+      });
+    } catch (error) {
+      // Activation events are product telemetry, not the security audit trail.
+      // A degraded telemetry store must never block the governed operation.
+      try {
+        this.#activationFailureReporter({
+          operation,
+          errorName: error instanceof Error ? error.name : "UnknownError",
+        });
+      } catch {
+        // The reporter is non-authoritative and must remain fail-open too.
+      }
       return null;
     }
-    const now = nowIso();
-    const event: ActivationEvent = {
-      id: randomId("activation"),
-      tenantId,
-      name,
-      actorId,
-      metadata: redactSecrets(metadata) as Record<string, unknown>,
-      createdAt: now,
-      updatedAt: now,
-      revision: 1,
-    };
-    return this.store.put(tenantId, "activation-events", event, {
-      expectedRevision: null,
-    });
   }
 
   async createRole(
