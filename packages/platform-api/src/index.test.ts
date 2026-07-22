@@ -1,4 +1,9 @@
-import { type AnalyticsQuery, AnalyticsQueryLimitError } from "@litemcp/analytics";
+import {
+  type AnalyticsQuery,
+  AnalyticsQueryLimitError,
+  createFailOpenAnalyticsRecorder,
+  MemoryAnalyticsStore,
+} from "@litemcp/analytics";
 import type {
   AnalyticsFlowsQuery,
   AnalyticsPolicyInsightsQuery,
@@ -282,6 +287,79 @@ describe("platform API", () => {
       document.paths["/api/v1/approvals/{approvalId}/decision"].post.requestBody
         .content["application/json"].schema.$ref
     ).toBe("#/components/schemas/ApprovalDecisionInput");
+  });
+
+  it("uses a server-generated request ID for persisted audit and analytics", async () => {
+    const attackerRequestId = `lmcp_refresh_${"a".repeat(64)}`;
+    const analytics = new MemoryAnalyticsStore();
+    const analyticsRecorder = createFailOpenAnalyticsRecorder(analytics);
+    const platform = new PlatformService(new MemoryDocumentStore(), {
+      analyticsRecorder,
+    });
+    await platform.ensureDemoTenant("org_demo", "http://localhost:8787");
+    const app = createPlatformApp({
+      platform,
+      gateway: new McpGateway({ platform }),
+      publicOrigin: "http://localhost:8787",
+      webOrigins: ["http://localhost:4321"],
+      demoMode: true,
+    });
+
+    const response = await app.request("/api/v1/sessions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-litemcp-role": "finance-admin",
+        "x-request-id": attackerRequestId,
+      },
+      body: JSON.stringify({
+        compositionId: "composition_company",
+        environmentId: "env_production",
+        subject: {
+          type: "user",
+          id: "user_request_id_regression",
+          roles: ["finance-admin"],
+          groups: [],
+          claims: {},
+        },
+        expiresInSeconds: 600,
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    const payload = await response.json();
+    const trustedRequestId = response.headers.get("x-request-id");
+    expect(trustedRequestId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+    expect(trustedRequestId).not.toBe(attackerRequestId);
+    expect(payload.meta.requestId).toBe(trustedRequestId);
+
+    await analyticsRecorder.flush();
+    const sessionId = payload.data.session.id as string;
+    const persistedAudit = await platform.listAudit("org_demo", 1_000);
+    const persistedUsage = (
+      await analytics.recent({
+        tenantId: "org_demo",
+        from: "2020-01-01T00:00:00.000Z",
+        to: "2100-01-01T00:00:00.000Z",
+        limit: 100,
+      })
+    ).events;
+    const sessionAudit = persistedAudit.filter(
+      (event) => event.type === "session.issued" && event.targetId === sessionId
+    );
+    const sessionUsage = persistedUsage.filter(
+      (event) => event.eventType === "session_minted" && event.sessionId === sessionId
+    );
+
+    expect(sessionAudit).toHaveLength(1);
+    expect(sessionUsage).toHaveLength(1);
+    expect(sessionAudit[0]?.requestId).toBe(trustedRequestId);
+    expect(sessionUsage[0]?.requestId).toBe(trustedRequestId);
+    expect(JSON.stringify({ persistedAudit, persistedUsage })).not.toContain(
+      attackerRequestId
+    );
   });
 
   it("rejects cross-tenant demo headers", async () => {

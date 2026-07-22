@@ -77,6 +77,9 @@ Failures use an RFC 9457-style problem document:
 ```
 
 Keep `requestId` when opening an incident or correlating API and audit records.
+LiteMCP generates this UUID at the HTTP boundary and returns it in both the
+`X-Request-ID` response header and response body. Caller-supplied
+`X-Request-ID` values are not trusted or persisted.
 
 ## Implemented routes
 

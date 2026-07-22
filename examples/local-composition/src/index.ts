@@ -5,16 +5,31 @@ import { type IssuedSession, LiteMcpClient, McpSessionClient } from "@litemcp/sd
 const baseUrl = process.env.LITEMCP_API_URL ?? "http://127.0.0.1:8787";
 const tenantId = "org_demo";
 
-const fetchWithRequestId =
-  (requestId: string): typeof fetch =>
+const serverRequestIds = new Map<string, string>();
+const requestIdPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+const fetchWithRequestLabel =
+  (requestLabel: string): typeof fetch =>
   async (input, init) => {
     const headers = new Headers(init?.headers);
-    headers.set("x-request-id", requestId);
-    return fetch(input, { ...init, headers });
+    // Exercise the untrusted caller-header boundary while correlating the proof
+    // with the trusted response ID that LiteMCP generated for this request.
+    headers.set("x-request-id", requestLabel);
+    const response = await fetch(input, { ...init, headers });
+    const serverRequestId = response.headers.get("x-request-id");
+    assert.match(serverRequestId ?? "", requestIdPattern);
+    assert.notEqual(serverRequestId, requestLabel);
+    serverRequestIds.set(requestLabel, serverRequestId ?? "");
+    return response;
   };
 
-const sessionClient = (issued: IssuedSession, requestId: string) =>
-  new McpSessionClient(issued.endpoint, issued.token, fetchWithRequestId(requestId));
+const sessionClient = (issued: IssuedSession, requestLabel: string) =>
+  new McpSessionClient(
+    issued.endpoint,
+    issued.token,
+    fetchWithRequestLabel(requestLabel)
+  );
 
 const admin = new LiteMcpClient({
   baseUrl,
@@ -155,7 +170,7 @@ const decidingAdmin = new LiteMcpClient({
   baseUrl,
   tenantId,
   demoRole: "finance-admin",
-  fetch: fetchWithRequestId("proof_approval_decided"),
+  fetch: fetchWithRequestLabel("proof_approval_decided"),
 });
 const decided = await decidingAdmin.decideApproval(approval.id, {
   decision: "approved",
@@ -217,14 +232,17 @@ await assert.rejects(() =>
 
 const audit = await admin.audit(500);
 const hasAudit = (
-  requestId: string,
+  requestLabel: string,
   type: string,
   outcome: "allowed" | "denied" | "pending" | "succeeded" | "failed"
-) =>
-  audit.some(
+) => {
+  const requestId = serverRequestIds.get(requestLabel);
+  assert.ok(requestId, `Missing server request ID for ${requestLabel}.`);
+  return audit.some(
     (event) =>
       event.requestId === requestId && event.type === type && event.outcome === outcome
   );
+};
 
 assert.ok(hasAudit("proof_builtin_allowed", "execution.completed", "succeeded"));
 assert.ok(hasAudit("proof_remote_allowed", "execution.completed", "succeeded"));

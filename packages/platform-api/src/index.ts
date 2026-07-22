@@ -45,7 +45,6 @@ import { demoSubject, type McpGateway } from "@litemcp/mcp-gateway";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
-import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import { type ZodType, z } from "zod";
 
@@ -69,6 +68,7 @@ type ApiActor = {
 
 type AppVariables = {
   actor: ApiActor;
+  requestId: string;
 };
 
 export type PlatformAppOptions = {
@@ -1194,7 +1194,15 @@ export const createPlatformApp = (options: PlatformAppOptions) => {
     });
   };
 
-  app.use("*", requestId());
+  app.use("*", async (c, next) => {
+    // Correlation IDs cross audit and analytics persistence boundaries. Never
+    // accept one from the request, even when it satisfies a UUID-shaped format:
+    // an attacker could otherwise persist a credential through X-Request-ID.
+    const trustedRequestId = crypto.randomUUID();
+    c.set("requestId", trustedRequestId);
+    c.header("X-Request-ID", trustedRequestId);
+    await next();
+  });
   app.use(
     "*",
     secureHeaders({

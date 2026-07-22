@@ -21,7 +21,9 @@ Request and response byte counts are measures, not retained bodies.
 `requestId` correlates analytics with the audit chain. Where an audit write has
 completed, a usage event may also carry its audit event ID, sequence, and hash
 as one all-or-nothing receipt. That linkage does not make analytics a durable
-or tamper-evident substitute for audit.
+or tamper-evident substitute for audit. HTTP request IDs are server-generated
+UUIDs; caller-provided correlation headers never become audit or analytics
+dimensions.
 
 ## Attribution and event semantics
 
