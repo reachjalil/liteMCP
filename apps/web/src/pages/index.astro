@@ -1,193 +1,96 @@
 ---
-import SectionHeader from "../components/SectionHeader.astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
 
-const buyerProblems = [
+const capabilities = [
   {
     index: "01",
-    title: "One endpoint instead of client-by-client sprawl",
-    description:
-      "Compose approved MCP server definitions behind a stable, namespaced endpoint while retaining the origin and schema of every tool.",
+    title: "Compose",
+    description: "Put built-in and remote tools behind one stable, namespaced endpoint.",
   },
   {
     index: "02",
-    title: "Least privilege begins at discovery",
-    description:
-      "Apply default-deny policy to tools/list and tools/call so a hidden capability cannot be recovered by guessing its name.",
+    title: "Govern",
+    description: "Apply default-deny policy at discovery and again before execution.",
   },
   {
     index: "03",
-    title: "Sensitive work stops before dispatch",
-    description:
-      "Bind approval to the session, composition, policy, server revision, authorization epoch, tool, and argument hash before an upstream call can run.",
+    title: "Prove",
+    description: "Bind one-shot approval to exact context and record payload-free evidence.",
   },
 ];
 ---
 
-<SiteLayout description="Open-source MCP governance for platform and security teams: identity-filtered discovery, exact-context approvals, payload-free analytics, and customer-controlled deployment.">
+<SiteLayout description="Govern MCP access through one identity-aware endpoint with filtered discovery, exact-context approvals, and payload-free evidence.">
   <section class="home-hero">
-    <img
-      class="home-hero__art"
-      src="/images/explainers/hero-convergence.webp"
-      width="2172"
-      height="724"
-      alt="Approved MCP servers converging into one governed endpoint."
-      decoding="async"
-      fetchpriority="high"
-    />
     <div class="shell home-hero__inner">
-      <div class="home-hero__copy">
-        <p class="eyebrow">Open-source governance for high-risk MCP access</p>
-        <h1 class="home-hero__headline">Give agents one MCP endpoint—not unrestricted access.</h1>
-        <p class="home-hero__description">
-          LiteMCP Composer helps platform and security teams compose approved MCP servers, filter
-          discovery by identity, re-check every call, require exact-context approval for sensitive
-          actions, and investigate usage without storing tool arguments or results.
-        </p>
-        <div class="home-hero__actions">
-          <a class="button button--accent button--large" href="/design-partners">Apply for a design-partner pilot</a>
-          <a class="button button--inverted button--large" href="/docs/getting-started#five-minute-proof">Run the five-minute proof</a>
+      <div class="home-hero__stage">
+        <div class="home-hero__copy">
+          <p class="eyebrow">Open-source MCP governance</p>
+          <h1 class="home-hero__headline">Govern every MCP call.</h1>
+          <p class="home-hero__description">
+            Put approved MCP servers behind one identity-aware endpoint. Filter tools by role,
+            approve sensitive actions, and record evidence without retaining arguments or results.
+          </p>
+          <div class="home-hero__actions">
+            <a class="button button--accent button--large" href="/docs/getting-started#five-minute-proof">Run the proof</a>
+            <a class="button button--inverted button--large" href="/design-partners">Apply for a pilot</a>
+          </div>
         </div>
+
+        <aside class="proof-terminal" aria-label="Five-minute local product proof">
+          <div class="proof-terminal__header">
+            <span>Five-minute proof</span>
+            <span>Local</span>
+          </div>
+          <div class="proof-terminal__command">
+            <span aria-hidden="true">$</span>
+            <code>pnpm demo:smoke</code>
+          </div>
+          <ul>
+            <li><span>PASS</span> Identity-filtered discovery</li>
+            <li><span>PASS</span> Guessed-call denial</li>
+            <li><span>PASS</span> Exact-context approval</li>
+            <li><span>PASS</span> Payload-free evidence</li>
+          </ul>
+          <a href="/docs/getting-started#five-minute-proof">See what the proof covers <span aria-hidden="true">↗</span></a>
+        </aside>
       </div>
-      <div class="home-hero__meta" aria-label="Current product commitments">
-        <span><b>01</b> Apache-2.0 product</span>
-        <span><b>02</b> Policy at list + call</span>
-        <span><b>03</b> Payload-free analytics</span>
-        <span><b>04</b> Pre-1.0 · local proof</span>
+
+      <div class="home-hero__meta" aria-label="Product availability">
+        <span><b>01</b> Apache 2.0</span>
+        <span><b>02</b> Self-hostable</span>
+        <span><b>03</b> No hosted account required</span>
       </div>
     </div>
   </section>
 
-  <section class="content-section">
-    <div class="shell">
-      <SectionHeader
-        eyebrow="The buyer problem"
-        title="MCP adoption becomes an access-control problem before it becomes a scale problem."
-        description="A reverse proxy can aggregate routes. A governance plane must preserve identity, capability provenance, policy, approval state, and evidence across the complete call path."
-      />
-      <div class="feature-grid">
-        {buyerProblems.map((problem) => (
-          <article class="feature-card">
-            <span class="feature-card__index">{problem.index}</span>
-            <h3>{problem.title}</h3>
-            <p>{problem.description}</p>
-          </article>
-        ))}
-      </div>
+  <section class="home-capabilities" aria-label="Core capabilities">
+    <div class="shell home-capabilities__grid">
+      {capabilities.map((capability) => (
+        <article>
+          <span>{capability.index}</span>
+          <h2>{capability.title}</h2>
+          <p>{capability.description}</p>
+        </article>
+      ))}
     </div>
   </section>
 
-  <section class="content-section content-section--dark">
-    <div class="shell">
-      <SectionHeader
-        eyebrow="Repository-backed scenario"
-        title="The refund tool is visible only to the right role—and still cannot run without approval."
-        description="This exact flow is covered by local core and gateway integration tests. It is product evidence, not a claim of a deployed customer journey."
-      />
-      <ol class="governance-scenario">
-        <li>
-          <span>01 / Discover</span>
-          <strong>Employee catalog stays narrow</strong>
-          <p><code>finance.issue_refund</code> is absent from the employee's policy-filtered tool list.</p>
-        </li>
-        <li>
-          <span>02 / Deny</span>
-          <strong>A guessed name remains denied</strong>
-          <p>A direct call cannot bypass discovery policy and never reaches the upstream executor.</p>
-        </li>
-        <li>
-          <span>03 / Approve</span>
-          <strong>Finance work pauses before dispatch</strong>
-          <p>The pending record binds the exact session, policy, composition, server, tool, epoch, and argument hash.</p>
-        </li>
-        <li>
-          <span>04 / Prove</span>
-          <strong>One matching retry, correlated evidence</strong>
-          <p>An approved retry is consumed once, with a redacted audit receipt and payload-free usage fact.</p>
-        </li>
-      </ol>
-      <div class="scenario-evidence">
-        <span>Current evidence</span>
-        <a href="https://github.com/reachjalil/liteMCP/blob/main/scripts/smoke-local-demo.mjs">Runnable loopback proof ↗</a>
-        <a href="https://github.com/reachjalil/liteMCP/blob/main/packages/core/src/platform-service.test.ts">Core approval and policy tests ↗</a>
-        <a href="https://github.com/reachjalil/liteMCP/blob/main/packages/mcp-gateway/src/index.test.ts">Gateway denial and dispatch tests ↗</a>
-      </div>
-    </div>
-  </section>
-
-  <section class="content-section content-section--signal-grid">
-    <div class="shell explainer-grid">
-      <figure class="explainer-visual">
-        <img
-          src="/images/explainers/identity-policy.webp"
-          width="1586"
-          height="992"
-          loading="lazy"
-          decoding="async"
-          alt="An identity passing through discovery, policy, approval, and execution controls."
-        />
-        <figcaption>
-          <span>Evidence path / 01</span>
-          Usage analytics and compliance audit remain separate, tenant-scoped pipelines.
-        </figcaption>
-      </figure>
-      <div class="explainer-copy">
-        <p class="eyebrow">Privacy is an architecture choice</p>
-        <h2>Investigate governance without building a payload archive.</h2>
-        <p>
-          The Insight Plane records bounded dimensions and measures—identity IDs, tools, policy
-          rules, outcomes, approval timing, and latency—while rejecting argument and result fields.
-        </p>
-        <ol class="signal-steps">
-          <li>
-            <span>01</span>
-            <div><strong>Payload-free usage facts</strong><p>Arguments, results, bearer tokens, emails, and display names are outside the analytics contract.</p></div>
-          </li>
-          <li>
-            <span>02</span>
-            <div><strong>Audit remains fail closed</strong><p>Execution checkpoints produce sequence/hash-linked, redacted evidence independently of fail-open analytics.</p></div>
-          </li>
-          <li>
-            <span>03</span>
-            <div><strong>Policy insight, not generic APM</strong><p>Review denial hotspots, zero-hit rules, visible-but-unused tools, approval latency, and session flows.</p></div>
-          </li>
-        </ol>
-        <a class="text-link" href="/product/observability">Inspect governance analytics <span aria-hidden="true">↗</span></a>
-      </div>
-    </div>
-  </section>
-
-  <section class="content-section content-section--subtle">
-    <div class="shell split-layout">
-      <div class="split-layout__aside">
-        <p class="eyebrow">Evidence before availability</p>
-        <h2>The product boundary is open. Production acceptance is still in progress.</h2>
-        <p>
-          The same public packages compose the Cloudflare reference and portable Node targets.
-          That architecture is useful; it is not a substitute for live client, identity-provider,
-          Kubernetes, recovery, and cross-target portability proof.
-        </p>
-      </div>
-      <dl class="definition-grid">
-        <dt>Tested locally</dt><dd>Composition, policy lifecycle, scoped sessions, approval decisions, audit, analytics, OAuth substrate, and import/export.</dd>
-        <dt>Public origin</dt><dd>An earlier site, health, readiness, TLS, and authentication-routing baseline is live with signups closed.</dd>
-        <dt>Acceptance pending</dt><dd>Current managed authority and analytics deployment, named clients, live enterprise IdPs, Kubernetes runtime, restore, upgrade, and the cloud-exit test.</dd>
-        <dt>Open-core boundary</dt><dd>Self-hosting does not require private code, a vendor account, a license server, billing, mandatory telemetry, or call-home.</dd>
-      </dl>
-    </div>
-  </section>
-
-  <section class="content-section content-section--tight">
-    <div class="shell cta-panel">
+  <section class="home-choice">
+    <div class="shell home-choice__inner">
       <div>
-        <p class="eyebrow">Design-partner program</p>
-        <h2>Pilot one high-risk MCP workflow with explicit acceptance criteria.</h2>
-        <p>Best fit: a platform or security team with multiple MCP servers, one sensitive action, and a customer-controlled deployment or payload-retention requirement.</p>
+        <p class="eyebrow">Open core, clear boundary</p>
+        <h2>Run it yourself. Or pilot it with us.</h2>
+        <p>
+          The complete self-hosted product is Apache 2.0. Managed Cloud is currently available as
+          a qualified design-partner pilot.
+        </p>
       </div>
-      <div class="cta-panel__actions">
-        <a class="button button--primary" href="/design-partners">Review pilot fit</a>
-        <a class="button" href="/docs/getting-started#five-minute-proof">Prove the local slice first</a>
+      <div class="home-choice__actions">
+        <a class="button button--primary" href="/docs/getting-started">Self-host LiteMCP</a>
+        <a class="button" href="/design-partners">Review pilot fit</a>
       </div>
     </div>
+    <p class="shell home-choice__status">Pre-1.0 · local proof passed · production acceptance in progress</p>
   </section>
 </SiteLayout>
