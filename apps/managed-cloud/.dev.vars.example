@@ -8,5 +8,6 @@ EMAIL_FROM=
 EMAIL_REPLY_TO=
 CREDENTIAL_MASTER_KEY=
 APPROVAL_WEBHOOK_URL=
+# Optional: omit to keep the Sentry SDK disabled and emit no Sentry events.
 SENTRY_DSN=
 SENTRY_ENVIRONMENT=development

@@ -42,22 +42,31 @@ const readTarget = (label, target) => {
       tenantFeedMaximum <= 10_000,
     `${label} TENANT_FEED_MAX_EVENTS must be an integer from 100 to 10000.`
   );
+  const requiredSecrets = target.secrets?.required;
   requireValue(
-    target.secrets?.required?.includes("BETTER_AUTH_SECRET"),
+    Array.isArray(requiredSecrets),
+    `${label} must declare its required secret names.`
+  );
+  requireValue(
+    requiredSecrets.includes("BETTER_AUTH_SECRET"),
     `${label} must declare BETTER_AUTH_SECRET as required.`
   );
   requireValue(
-    target.secrets?.required?.includes("CREDENTIAL_MASTER_KEY"),
+    requiredSecrets.includes("CREDENTIAL_MASTER_KEY"),
     `${label} must declare CREDENTIAL_MASTER_KEY as required.`
   );
   requireValue(
-    target.secrets?.required?.includes("SENTRY_DSN"),
-    `${label} must declare SENTRY_DSN as required.`
+    !requiredSecrets.includes("SENTRY_DSN"),
+    `${label} must keep SENTRY_DSN optional in the public customer-owned reference.`
+  );
+  requireValue(
+    !Object.hasOwn(target.vars ?? {}, "SENTRY_DSN"),
+    `${label} must not commit an optional SENTRY_DSN as a plain variable.`
   );
   if (target.vars.SIGNUPS_ENABLED === "true") {
     requireValue(
-      target.secrets.required.includes("RESEND_API_KEY") &&
-        target.secrets.required.includes("EMAIL_FROM"),
+      requiredSecrets.includes("RESEND_API_KEY") &&
+        requiredSecrets.includes("EMAIL_FROM"),
       `${label} must require RESEND_API_KEY and EMAIL_FROM before signup is enabled.`
     );
   }

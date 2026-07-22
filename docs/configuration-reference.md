@@ -108,8 +108,8 @@ provider and its technical names remain in Wrangler bindings and the adapter.
 | `RESEND_API_KEY` | When signup is enabled | Secret used for verification, reset, and invitation email delivery |
 | `EMAIL_FROM` | When signup is enabled | Verified sender value, supplied as a secret rather than committed config |
 | `EMAIL_REPLY_TO` | No | Optional reply-to value supplied through the secret store |
-| `SENTRY_DSN` | Managed deployments | Sentry project DSN used by the Cloudflare Worker SDK for handled and unhandled errors |
-| `SENTRY_ENVIRONMENT` | Yes | Checked-in deployment label (`production` or `staging`) attached to error events |
+| `SENTRY_DSN` | No | Optional operator-owned Sentry project DSN; when absent, the Cloudflare Worker SDK is disabled and emits no Sentry events |
+| `SENTRY_ENVIRONMENT` | No | Checked-in deployment label (`production` or `staging`) used only when the optional Sentry integration is enabled |
 
 The managed query API currently reads `TENANT_FEED`, not Analytics Engine SQL.
 Increasing an HTTP date range does not restore events evicted by the count cap.
@@ -138,9 +138,13 @@ pnpm --filter @litemcp/managed-cloud exec wrangler whoami
 pnpm managed-cloud:do-lifecycle -- --env production
 pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put BETTER_AUTH_SECRET --env=
 pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put CREDENTIAL_MASTER_KEY --env=
-pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put SENTRY_DSN --env=
 pnpm --filter @litemcp/managed-cloud db:migrate:remote
 ```
+
+Sentry is not part of the required deployment sequence. An operator that elects
+to use it can add `SENTRY_DSN` as a Worker secret for the explicit target; the
+public configuration validator rejects making that third-party integration a
+required secret or committing its DSN as a plain variable.
 
 Configure the account-owned route/custom domain and make `PUBLIC_ORIGIN` and
 `WEB_ORIGINS` match it before directing traffic to the Worker. Apply trigger

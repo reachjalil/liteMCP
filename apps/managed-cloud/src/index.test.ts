@@ -11,6 +11,7 @@ import {
   type ManagedAnalyticsRuntime,
   resolveManagedAnalyticsRuntime,
   resolveManagedCloudAuthConfiguration,
+  resolveSentryConfiguration,
   shouldRouteToWorker,
 } from "./index.js";
 
@@ -152,6 +153,33 @@ describe("managed-cloud auth configuration", () => {
         EMAIL_FROM: "hello@example.com",
       })
     ).toThrow("RESEND_API_KEY and EMAIL_FROM");
+  });
+});
+
+describe("managed-cloud optional error tracking", () => {
+  it("keeps Sentry disabled when the operator does not supply a DSN", () => {
+    expect(resolveSentryConfiguration({ SENTRY_ENVIRONMENT: "staging" })).toEqual({
+      dsn: undefined,
+      enabled: false,
+      environment: "staging",
+      sendDefaultPii: false,
+      tracesSampleRate: 0,
+    });
+  });
+
+  it("enables the opt-in integration without enabling PII or tracing", () => {
+    expect(
+      resolveSentryConfiguration({
+        SENTRY_DSN: " sentry-dsn-placeholder ",
+        SENTRY_ENVIRONMENT: "production",
+      })
+    ).toEqual({
+      dsn: "sentry-dsn-placeholder",
+      enabled: true,
+      environment: "production",
+      sendDefaultPii: false,
+      tracesSampleRate: 0,
+    });
   });
 });
 

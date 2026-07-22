@@ -329,14 +329,21 @@ const handler = {
   },
 } satisfies ExportedHandler<CloudflareEnv>;
 
-export default Sentry.withSentry(
-  (env: CloudflareEnv) => ({
-    dsn: env.SENTRY_DSN,
-    enabled: Boolean(env.SENTRY_DSN),
+export const resolveSentryConfiguration = (
+  env: Pick<CloudflareEnv, "SENTRY_DSN" | "SENTRY_ENVIRONMENT">
+) => {
+  const dsn = env.SENTRY_DSN?.trim() || undefined;
+  return {
+    dsn,
+    enabled: Boolean(dsn),
     environment: env.SENTRY_ENVIRONMENT ?? "production",
     sendDefaultPii: false,
     tracesSampleRate: 0,
-  }),
+  };
+};
+
+export default Sentry.withSentry(
+  (env: CloudflareEnv) => resolveSentryConfiguration(env),
   handler
 );
 

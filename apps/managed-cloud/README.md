@@ -82,7 +82,6 @@ pnpm --filter @litemcp/managed-cloud exec wrangler whoami
 pnpm managed-cloud:do-lifecycle -- --env production
 pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put BETTER_AUTH_SECRET --env=
 pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put CREDENTIAL_MASTER_KEY --env=
-pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put SENTRY_DSN --env=
 pnpm --filter @litemcp/managed-cloud db:migrate:remote
 ```
 
@@ -162,7 +161,6 @@ pnpm managed-cloud:do-lifecycle -- --identity staging
 pnpm managed-cloud:do-lifecycle -- --env staging
 pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put BETTER_AUTH_SECRET --env staging
 pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put CREDENTIAL_MASTER_KEY --env staging
-pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put SENTRY_DSN --env staging
 pnpm --filter @litemcp/managed-cloud exec wrangler triggers deploy --env staging
 ```
 
@@ -222,14 +220,25 @@ the rendered login UI aligned with the Worker runtime.
 
 ## Error tracking
 
-Both managed targets require `SENTRY_DSN`. The Worker SDK captures uncaught
-runtime failures and control-plane exceptions that Hono converts into safe 500
-responses. It tags only the generated request ID, route pathname, method, and
-the checked-in environment name; default personally identifying data is
-disabled. Cloudflare Workers observability remains enabled for native logs and
-metrics. Configure the error-rate alert and its notification target in the
-Sentry project before promoting either target; alert configuration is external
-deployment evidence and is not implied by the checked-in DSN binding.
+Sentry is an optional, operator-enabled integration in this customer-owned
+reference. Without `SENTRY_DSN`, the SDK is disabled and emits no Sentry events;
+authentication, authorization, audit, analytics, and MCP execution continue
+locally. To opt in for one explicit target, add the secret without committing
+its value:
+
+```bash
+pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put SENTRY_DSN --env staging
+# Use --env= for the separately reviewed production target.
+```
+
+When enabled, the Worker SDK captures uncaught runtime failures and
+control-plane exceptions that Hono converts into safe 500 responses. It tags
+only the generated request ID, route pathname, method, and checked-in
+environment name; default personally identifying data and tracing are disabled.
+Cloudflare Workers observability remains enabled in the account-owned platform
+for native logs and metrics. Configure any Sentry alert and notification target
+in the operator's project; neither a DSN nor an external alert is required by
+the public product.
 
 ## Deployment smoke
 

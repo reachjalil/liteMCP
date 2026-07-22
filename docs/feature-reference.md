@@ -85,7 +85,7 @@ For the authoritative status and release gates, read
 | Health endpoint | Available now | `/health` reports process and store capabilities | Component-level dependency detail and published SLOs |
 | Readiness endpoint | Available now | `/ready` fails closed without production auth/durable store and probes the store | Full dependency readiness and deployment smoke across real targets |
 | Portable export/import | Preview | Management API, console, SDKs, and CLI export non-secret configuration; import fully validates a pristine target, disables imported IdPs, and commits authority last | Atomic recovery, version migration, secret re-consent/reconfiguration, and live cloud-to-Kubernetes test |
-| OpenTelemetry, alerts, and SIEM | Designed | Request/audit correlation, structured usage facts, CSV pull, and Sentry are substrate only; no OTel exporter, configured analytics alert, digest, or SIEM push exists | OTel instrumentation/exporters, O-F alert/digest delivery, SIEM integration, retention controls, and deployment proof |
+| OpenTelemetry, alerts, and SIEM | Designed | Request/audit correlation, structured usage facts, CSV pull, and optional operator-enabled Sentry are substrate only; no OTel exporter, configured analytics alert, digest, or SIEM push exists | OTel instrumentation/exporters, O-F alert/digest delivery, SIEM integration, retention controls, and deployment proof |
 | Backup/restore | Preview | Mongo-focused scripts and runbook exist | Encrypted live backup, restore, recovery-time evidence, and scheduled rehearsal |
 | Upgrade/rollback | Preview | Runbook, chart, and release policy exist | Real cluster upgrade/rollback and compatibility evidence |
 
@@ -96,7 +96,7 @@ For the authoritative status and release gates, read
 | Local demo | Available now | Explicit loopback-only memory-backed evaluation mode with deterministic fixtures |
 | Docker Compose | Preview | Web, Node server, reverse proxy, and authenticated single-member Mongo replica-set/keyfile configuration render and images build; full product journey remains to be recorded |
 | Kubernetes/Helm | Preview | Portable Node server and web images; chart supports internal/external Mongo, HA, Ingress, security contexts, probes, PDB/HPA, topology, and NetworkPolicy; no real cluster acceptance run yet |
-| Managed cloud | Public preview; current revision unproved | An earlier Worker version serves the public site/health/session smoke; the working tree adds KV + authority/feed Durable Objects + D1, Analytics Engine emission, staging, and email/Sentry gates | Deploy/migrate this revision; run privileged/OAuth/MCP/analytics/rollback/load/security acceptance; add Analytics Engine historical querying if required and configure alerts/WAF |
+| Managed cloud | Public preview; current revision unproved | An earlier Worker version serves the public site/health/session smoke; the working tree adds KV + authority/feed Durable Objects + D1, Analytics Engine emission, staging, signup-email gates, and optional operator-enabled Sentry | Deploy/migrate this revision; run privileged/OAuth/MCP/analytics/rollback/load/security acceptance; add Analytics Engine historical querying if required and configure alerts/WAF |
 
 ## Client surfaces
 

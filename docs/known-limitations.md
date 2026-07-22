@@ -238,7 +238,7 @@ production-ready enterprise release. This list is intentionally conservative.
   organization-wide concurrency limits, identity-specific quotas, anomaly
   detection, audit retention, WebSocket/SSE, Mongo change streams,
   OpenTelemetry traces/metrics, configured alerts, weekly digests, and SIEM
-  delivery remain absent. O-F is outstanding. Request-correlated Sentry,
+  delivery remain absent. O-F is outstanding. Optional request-correlated Sentry,
   activation events, fixed organization quotas, and Better Auth database rate
   limits still have no deployed event, alert, load, or capacity evidence.
 
