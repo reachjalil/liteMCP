@@ -783,17 +783,13 @@ pre {
   font-size: 9px;
 }
 
-.proof-terminal > a {
+.proof-terminal__note {
   display: block;
+  margin: 0;
   padding: 14px 16px;
   border-top: 1px solid #2d332f;
   color: #89958e;
   font-size: 10px;
-  text-decoration: none;
-}
-
-.proof-terminal > a:hover {
-  color: #6ce0b4;
 }
 
 .home-capabilities {
@@ -862,19 +858,13 @@ pre {
   color: var(--muted);
 }
 
-.home-choice__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 .home-choice__status {
   margin-top: 58px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
-  color: var(--faint);
+  color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -2752,7 +2742,7 @@ pre {
     font-size: clamp(42px, 12vw, 56px);
   }
 
-  .home-choice__actions .button {
+  .home-choice__inner > .button {
     width: 100%;
   }
 
