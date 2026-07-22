@@ -27,6 +27,10 @@ fi
 
 mkdir -p "$destination/payload/assets" "$destination/payload/worker"
 
+# The archive builder is a release boundary and must succeed from a clean
+# checkout, independent of build products created by another CI job.
+pnpm --filter '@litemcp/managed-cloud^...' build
+
 if [[ "$target" == "production" ]]; then
   pnpm --filter @litemcp/managed-cloud build:web
   wrangler_environment=(--env=)
