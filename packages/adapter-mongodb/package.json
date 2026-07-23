@@ -15,10 +15,12 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run src",
     "types": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@litemcp/analytics": "workspace:*",
+    "@litemcp/contracts": "workspace:*",
     "@litemcp/storage": "workspace:*",
     "mongodb": "catalog:"
   },

@@ -1,0 +1,4 @@
+interface:
+  display_name: "LiteMCP Security Review"
+  short_description: "Review tenant and security boundaries"
+  default_prompt: "Use $litemcp-security-review to review this change against LiteMCP security invariants."

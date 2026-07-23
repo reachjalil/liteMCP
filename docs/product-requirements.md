@@ -5,10 +5,10 @@ in [`../IMPLEMENTATION_STATUS.md`](../IMPLEMENTATION_STATUS.md).
 
 ## Product definition
 
-LiteMCP Composer is a fully open-source management platform for creating,
-importing, publishing, composing, and governing MCP servers and reusable skills.
-It gives each organization one stable MCP endpoint while showing each human or
-service identity only the capabilities it may discover and execute.
+LiteMCP Composer has a fully open-source product core for creating, importing,
+publishing, composing, and governing MCP servers and reusable skills. It gives
+each organization one stable MCP endpoint while showing each human or service
+identity only the capabilities it may discover and execute.
 
 MCP composition is the product category, not an adapter feature. The product
 must model MCP protocol and enterprise composition concerns directly:
@@ -21,11 +21,11 @@ model-hosting, and agent-runtime features are deliberately out of scope.
 > of MCP servers, with exact control over what each identity may discover and
 > execute.
 
-The public managed cloud is a free adoption/community service. The complete
-self-hosted product is also free. Commercial contracts purchase on-premises
-installation, migration, integration, supported LTS, operational management,
-training, security response, and response-time commitments—not secret product
-features.
+The complete self-hosted product is free and does not require a cloud account,
+license key, call home, or remote entitlement service. LiteMCP may separately
+sell an operated managed-cloud service and professional support. Charges cover
+hosting, metered resources, fleet operations, support, and contractual service
+levels—not secret tenant product features.
 
 ## Outcomes
 
@@ -50,7 +50,8 @@ features.
 - a vector database or RAG platform;
 - a proprietary MCP dialect;
 - catalog-count competition without compatibility evidence;
-- payment collection or paid managed cloud tiers;
+- paywalling tenant product capabilities that self-hosters need to operate the
+  product;
 - unverified claims about compliance, uptime, scale, or connector quality.
 
 ## Personas and required journeys
@@ -281,10 +282,11 @@ See [`policy/routing-and-authorization.md`](policy/routing-and-authorization.md)
 
 ### Managed cloud offering (currently Cloudflare)
 
-- Astro static site and console, Hono Workers, KV product `DocumentStore`, D1
-  Better Auth store, planned Durable Object mutation serialization, R2, and
-  Queues.
-- Transparent fair-use and anti-abuse limits with no paid upgrade path.
+- Astro static site and console, Hono Workers, a KV plus per-tenant Durable
+  Object product `DocumentStore`, and a D1 Better Auth store. R2 artifacts,
+  Queues, and transactional outbox delivery remain target components.
+- Transparent hosted-service plans, quotas, billing, and anti-abuse limits;
+  these commercial controls do not apply to self-hosted deployments.
 - Account export and deletion, configuration export, and documented migration
   to self-hosting.
 - The same public source and schemas as the on-premises distribution.

@@ -23,7 +23,14 @@ Entra integration, generic OIDC, mapping, SCIM, RBAC, and policy enforcement are
 - The Hono API and MCP gateway independently enforce current roles and policy. A Better Auth session proves authentication; it is not an authorization decision.
 - MCP data-plane session tokens are short lived, have a distinct audience/key purpose, and carry or reference the current authorization version.
 
-The initial Cloudflare DocumentStore adapter is Workers KV. Concurrent JIT, group, mapping, deprovisioning, and revocation writes require the planned Durable Object serialization and tested invalidation bounds before enterprise production use. The Kubernetes adapter uses a MongoDB replica set with conditional writes and transactions. Storage choice must not alter claim-mapping or policy semantics.
+The working-tree Cloudflare DocumentStore keeps non-authoritative records in
+Workers KV and routes current roles, IdP controls, sessions/epochs, policy, and
+related authority state through a tenant Durable Object. That is per-document
+serialization, not a complete JIT/SCIM transaction or deployed invalidation
+proof. The Kubernetes adapter uses a MongoDB replica set with conditional
+writes and transactions, although current identity workflows do not yet wrap
+compound state/audit changes in a transaction. Storage choice must not alter
+claim-mapping or policy semantics.
 
 ## Target supported flow
 

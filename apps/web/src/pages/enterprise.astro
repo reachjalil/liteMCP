@@ -3,56 +3,56 @@ import PageHero from "../components/PageHero.astro";
 import SectionHeader from "../components/SectionHeader.astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
 
-const services = [
+const evaluationAreas = [
   [
-    "Architecture and preflight",
-    "Topology, threat model, capacity, ingress, identity, storage, vault, and observability review.",
+    "Governance boundary",
+    "Identify the users, servers, clients, sensitive actions, discovery rules, denials, approvals, and evidence that make the evaluation falsifiable.",
   ],
   [
-    "Installation and migration",
-    "Repeatable deployment, existing MCP inventory import, policy translation, and cutover support.",
+    "Deployment target",
+    "Qualify customer-controlled infrastructure or the invite-only managed track without assuming production readiness in either environment.",
   ],
   [
-    "HA and recovery",
-    "Replica strategy, disruption budgets, backups, restore drills, rollback, and disaster-recovery exercises.",
+    "Identity and credentials",
+    "Map the real identity provider and upstream authentication method, then expose any live federation or credential-broker proof that is still missing.",
   ],
   [
-    "Identity integration",
-    "OIDC, SAML, SCIM, group mappings, service principals, and existing vault or KMS integration.",
+    "Security acceptance",
+    "Confirm tenant isolation, denied paths, revocation, audit integrity, payload exclusions, egress boundaries, and dependency-failure behavior in scope.",
   ],
   [
-    "Supported operations",
-    "LTS planning, upgrade assistance, security patch response, diagnostics, and named escalation paths.",
+    "Operational gaps",
+    "Record what remains unproven across backups, restore, rollout, rollback, upgrades, load, regional behavior, diagnostics, and support ownership.",
   ],
   [
-    "Restricted environments",
-    "Private registry mirroring, signed artifact transfer, offline installation, and air-gap runbooks.",
+    "Commercial qualification",
+    "Discuss price or responsibility only after the pilot scope is credible. No form submission creates a contract, account, SLA, or production commitment.",
   ],
 ];
 ---
 
-<SiteLayout title="Enterprise on-prem services" description="The intended LiteMCP Composer enterprise model funds accountable deployment and operations around the open product; commercial terms are not yet published.">
+<SiteLayout title="Enterprise evaluation" description="Qualify an invite-only LiteMCP Composer design-partner pilot around one high-risk MCP workflow, explicit evidence, and a customer-controlled or managed deployment boundary.">
   <PageHero
-    eyebrow="Enterprise on-prem · Planned services"
-    title="The commercial model is accountability, not permission."
-    description="Future LiteMCP Composer engagements are intended to cover installation, integration, upgrades, reliability, security response, and support inside customer environments. No current SLA or production service commitment is asserted."
-    signal="Planned services, no feature gates"
+    eyebrow="Enterprise evaluation · Invite only"
+    title="Qualify the workflow before discussing a rollout."
+    description="The current program is for platform and security teams that can evaluate one high-risk MCP action against explicit identity, policy, approval, privacy, and deployment criteria. It is not a generally available services catalog."
+    signal="Design-partner pilots · no current SLA"
   >
     <Fragment slot="actions">
-      <a class="button button--primary button--large" href="mailto:enterprise@litemcpcomposer.com">Discuss a design partnership</a>
-      <a class="button button--large" href="/docs/self-hosting">Review self-hosting</a>
+      <a class="button button--primary button--large" href="/design-partners">Review fit and apply</a>
+      <a class="button button--large" href="/docs/getting-started#five-minute-proof">Run the local proof</a>
     </Fragment>
   </PageHero>
 
   <section class="content-section">
     <div class="shell">
       <SectionHeader
-        eyebrow="Engagement scope"
-        title="A planned service scope around a public codebase."
-        description="A future contract can define deliverables, response commitments, environments, release lines, and ownership without creating a private product fork."
+        eyebrow="Qualification scope"
+        title="Questions a credible pilot must answer."
+        description="These are evaluation areas, not promised professional services. The output should distinguish repository-backed behavior, environment-specific proof, and unresolved production requirements."
       />
       <div class="feature-grid">
-        {services.map(([title, description], index) => (
+        {evaluationAreas.map(([title, description], index) => (
           <article class="feature-card">
             <span class="feature-card__index">{String(index + 1).padStart(2, "0")}</span>
             <h3>{title}</h3>
@@ -65,16 +65,16 @@ const services = [
 
   <section class="content-section content-section--subtle">
     <div class="shell">
-      <SectionHeader eyebrow="Boundary" title="What a services contract does and does not buy." />
+      <SectionHeader eyebrow="Boundary" title="What a pilot can and cannot establish." />
       <div class="comparison-table-wrap">
         <table class="comparison-table">
-          <thead><tr><th>Open-source maturity</th><th>Potential contracted operations</th></tr></thead>
+          <thead><tr><th>Current public evidence</th><th>Pilot evidence still required</th></tr></thead>
           <tbody>
-            <tr><td>Policy and audit available; SSO/SCIM wiring and approvals in preview</td><td>IdP implementation, mapping review, and lifecycle runbooks</td></tr>
-            <tr><td>Docker images and Helm renders in preview; live HA/recovery proof pending</td><td>Environment design, installation, validation, and recovery drills</td></tr>
-            <tr><td>Security fixes and public advisories</td><td>Defined response targets, supported patch windows, and escalation</td></tr>
-            <tr><td>Stable/LTS release mechanisms planned</td><td>Upgrade planning, compatibility assessment, and assisted rollback</td></tr>
-            <tr><td>Audit export in preview; OpenTelemetry and SIEM integrations planned</td><td>Integration with your SIEM, traces, metrics, and on-call process</td></tr>
+            <tr><td>Local identity-scoped discovery, execution policy, exact-context approval, revocation, and redacted audit proof</td><td>The actual client, identity source, upstream server, roles, denied path, and sensitive action in the pilot environment</td></tr>
+            <tr><td>Docker Compose assets and Helm lint/render checks</td><td>Live cluster install, ingress, secret handling, backup, restore, load, upgrade, rollback, and failure behavior</td></tr>
+            <tr><td>Payload-free analytics contracts, sink behavior, quotas, aggregation, export, and tenant feeds under automated tests</td><td>Deployment-specific storage, retention, access, export, query, and privacy acceptance</td></tr>
+            <tr><td>Public threat model, security policy, known limitations, and dependency gates</td><td>External security review, incident ownership, response targets, patch windows, and any required compliance evidence</td></tr>
+            <tr><td>Apache-2.0 self-hosting boundary with no private package dependency or call-home requirement</td><td>A live export/import/execute exit test between the managed and customer-controlled targets</td></tr>
           </tbody>
         </table>
       </div>
@@ -83,9 +83,10 @@ const services = [
 
   <section class="content-section content-section--tight">
     <div class="shell legal-note">
-      No enterprise service is represented as generally available here. Certifications,
-      availability SLAs, support response times, named LTS dates, pricing, and contractual terms
-      are not yet published.
+      No enterprise service is represented as generally available. Certifications, external audit
+      completion, availability SLAs, support response times, named LTS dates, pricing, and
+      contractual terms are not published. A design-partner application is qualification input,
+      not an order or service commitment.
     </div>
   </section>
 </SiteLayout>

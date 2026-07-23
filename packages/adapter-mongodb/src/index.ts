@@ -1,5 +1,3 @@
-import type { Collection, Db, Filter, MongoClient } from "mongodb";
-
 import {
   type CollectionName,
   type DocumentStore,
@@ -11,6 +9,9 @@ import {
   type StoredDocument,
   TenantBoundaryError,
 } from "@litemcp/storage";
+import type { Collection, Db, Filter, MongoClient } from "mongodb";
+
+export * from "./analytics.js";
 
 type MongoStoredDocument = StoredDocument & {
   _id: string;

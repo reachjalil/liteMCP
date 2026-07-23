@@ -1,0 +1,311 @@
+---
+import PageHero from "../components/PageHero.astro";
+import SectionHeader from "../components/SectionHeader.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+---
+
+<SiteLayout
+  title="Design partners"
+  description="Apply for an invite-only LiteMCP Composer pilot focused on one high-risk MCP workflow, explicit governance acceptance criteria, and customer-controlled deployment."
+>
+  <PageHero
+    eyebrow="Invite-only design-partner program"
+    title="Pilot one governed MCP workflow—not a generic gateway rollout."
+    description="We are looking for platform and security teams with multiple MCP servers, one sensitive action, and a concrete access-control, evidence, privacy, or deployment-boundary problem. Applications qualify a conversation; they do not create an account or promise availability."
+    signal="Pre-1.0 · qualified pilots only"
+  >
+    <Fragment slot="actions">
+      <a class="button button--primary button--large" href="#apply">Apply for a pilot</a>
+      <a class="button button--large" href="/docs/getting-started#five-minute-proof">Run the local proof first</a>
+    </Fragment>
+  </PageHero>
+
+  <section class="content-section">
+    <div class="shell">
+      <SectionHeader
+        eyebrow="Pilot contract"
+        title="Start with a falsifiable workflow and finish with evidence."
+        description="The scope is deliberately narrow so both teams can decide whether LiteMCP solves a real governance problem before expanding the product or rollout."
+      />
+      <div class="workflow-grid">
+        <article class="workflow-step">
+          <span>01</span>
+          <h3>Qualify the boundary</h3>
+          <p>Inventory the MCP servers, clients, upstream authentication, identity source, sensitive action, and deployment constraints that matter to the pilot.</p>
+        </article>
+        <article class="workflow-step">
+          <span>02</span>
+          <h3>Define acceptance</h3>
+          <p>Choose one identity-scoped discovery rule, one denied path, one approval-gated action, and the evidence required to judge the result.</p>
+        </article>
+        <article class="workflow-step">
+          <span>03</span>
+          <h3>Record the gaps</h3>
+          <p>Separate what passes from missing client, identity, credential, deployment, and operational proof. A pilot does not silently become a production claim.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-section content-section--subtle">
+    <div class="shell split-layout">
+      <div class="split-layout__aside">
+        <p class="eyebrow">Good pilot fit</p>
+        <h2>A team blocked by governance, not a team shopping for connector breadth.</h2>
+        <p>
+          The current product is best evaluated against MCP servers you already control. It does
+          not yet provide a production SLA, certified compliance posture, broad connector catalog,
+          or complete per-user upstream credential broker.
+        </p>
+      </div>
+      <ul class="principle-list">
+        <li><span>01</span><div><strong>Two or more MCP servers</strong><p>You are consolidating duplicated client configuration or an internal proxy pattern.</p></div></li>
+        <li><span>02</span><div><strong>One meaningful authorization boundary</strong><p>Different identities should discover or execute different tools.</p></div></li>
+        <li><span>03</span><div><strong>One sensitive action</strong><p>A financial, destructive, administrative, or similarly high-risk call should pause before dispatch.</p></div></li>
+        <li><span>04</span><div><strong>A privacy or deployment constraint</strong><p>You need payload-free product analytics, customer-controlled infrastructure, or an explicit no-call-home boundary.</p></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="content-section" id="apply">
+    <div class="shell pilot-layout">
+      <div class="pilot-layout__intro">
+        <p class="eyebrow">Application</p>
+        <h2>Tell us about the workflow you need to govern.</h2>
+        <p>
+          We use these answers to assess technical fit and prioritize an invite-only pilot.
+          Do not include credentials, tokens, tool arguments, tool results, regulated data, or
+          confidential customer information.
+        </p>
+        <div class="legal-note">
+          Submitting this form does not create an account, paid service, SLA, or production
+          commitment. See the <a href="/privacy">privacy policy</a> for processing and retention
+          information.
+        </div>
+      </div>
+
+      <form
+        class="pilot-form"
+        action="/api/managed/v1/design-partner-applications"
+        method="post"
+        accept-charset="UTF-8"
+        data-pilot-form
+      >
+        <fieldset>
+          <legend>About you</legend>
+          <div class="pilot-form__grid">
+            <label>
+              <span>Full name</span>
+              <input name="fullName" type="text" autocomplete="name" minlength="2" maxlength="120" required />
+            </label>
+            <label>
+              <span>Work email</span>
+              <input name="workEmail" type="email" autocomplete="email" maxlength="254" required />
+            </label>
+            <label>
+              <span>Organization</span>
+              <input name="organizationName" type="text" autocomplete="organization" minlength="2" maxlength="160" required />
+            </label>
+            <label>
+              <span>Role or title</span>
+              <input name="roleTitle" type="text" autocomplete="organization-title" minlength="2" maxlength="120" required />
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Current MCP environment</legend>
+          <div class="pilot-form__grid">
+            <label>
+              <span>MCP servers in scope</span>
+              <select name="serverCount" required>
+                <option value="">Select a range</option>
+                <option value="2-5">2–5</option>
+                <option value="6-20">6–20</option>
+                <option value="21-plus">21 or more</option>
+              </select>
+            </label>
+            <label>
+              <span>Potential governed users</span>
+              <select name="userCount" required>
+                <option value="">Select a range</option>
+                <option value="1-20">1–20</option>
+                <option value="21-100">21–100</option>
+                <option value="101-plus">101 or more</option>
+              </select>
+            </label>
+            <label class="pilot-form__wide">
+              <span>MCP clients or agent runtimes in scope</span>
+              <input
+                name="mcpClients"
+                type="text"
+                maxlength="240"
+                placeholder="Internal agent, coding assistant, custom runtime"
+                aria-describedby="mcp-clients-help"
+                required
+              />
+              <small id="mcp-clients-help">Names help us qualify compatibility work; they are not treated as currently verified integrations.</small>
+            </label>
+            <label>
+              <span>Upstream authentication</span>
+              <select name="upstreamAuth" required>
+                <option value="">Select the closest fit</option>
+                <option value="none">None or network-controlled</option>
+                <option value="oauth">OAuth</option>
+                <option value="api-key">API key or bearer credential</option>
+                <option value="mixed">Mixed methods</option>
+                <option value="unknown">Not sure yet</option>
+              </select>
+            </label>
+            <label>
+              <span>Identity provider</span>
+              <select name="identityProvider" required>
+                <option value="">Select the closest fit</option>
+                <option value="none">None for this pilot</option>
+                <option value="entra">Microsoft Entra ID</option>
+                <option value="okta">Okta</option>
+                <option value="google">Google Workspace</option>
+                <option value="other">Another provider</option>
+                <option value="unknown">Not sure yet</option>
+              </select>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Pilot outcome</legend>
+          <div class="pilot-form__grid">
+            <label>
+              <span>Preferred deployment</span>
+              <select name="deploymentTarget" required>
+                <option value="">Select a target</option>
+                <option value="self-hosted">Customer-controlled infrastructure</option>
+                <option value="managed-cloud">Invite-only managed preview</option>
+                <option value="either">Either, based on fit</option>
+              </select>
+            </label>
+            <label>
+              <span>Evaluation timeline</span>
+              <select name="timeline" required>
+                <option value="">Select a timeline</option>
+                <option value="now">Ready to evaluate now</option>
+                <option value="30-days">Within 30 days</option>
+                <option value="quarter">This quarter</option>
+                <option value="exploring">Exploring the problem</option>
+              </select>
+            </label>
+            <label class="pilot-form__wide">
+              <span>Sensitive workflow and acceptance goal</span>
+              <textarea
+                name="sensitiveWorkflow"
+                rows="7"
+                minlength="20"
+                maxlength="1500"
+                placeholder="Describe the action, who should discover or execute it, what should be denied or approved, and what evidence would make the pilot useful."
+                required
+              ></textarea>
+            </label>
+          </div>
+        </fieldset>
+
+        <label class="pilot-form__trap" aria-hidden="true">
+          Website
+          <input name="website" type="text" tabindex="-1" autocomplete="off" />
+        </label>
+        <input name="privacyNoticeVersion" type="hidden" value="2026-07-22" />
+
+        <label class="pilot-form__consent">
+          <input name="consent" type="checkbox" required />
+          <span>I agree that LiteMCP project maintainers may use this information to assess and contact me about the design-partner program under the <a href="/privacy">privacy policy</a>.</span>
+        </label>
+
+        <div class="pilot-form__submit">
+          <button class="button button--primary button--large" type="submit">Submit pilot application</button>
+          <small>Applications are reviewed for fit. There is no automatic account creation or acceptance.</small>
+        </div>
+        <div class="pilot-form__status" role="status" aria-live="polite" tabindex="-1" hidden data-pilot-status></div>
+
+        <noscript>
+          <div class="legal-note">
+            JavaScript is not required. The form will submit normally and return to this page when
+            the managed intake endpoint accepts it.
+          </div>
+        </noscript>
+      </form>
+    </div>
+  </section>
+
+  <script is:inline>
+    (() => {
+      const form = document.querySelector("[data-pilot-form]");
+      const status = document.querySelector("[data-pilot-status]");
+      if (!(form instanceof HTMLFormElement) || !(status instanceof HTMLElement)) return;
+
+      const showStatus = (state, message) => {
+        status.hidden = false;
+        status.dataset.state = state;
+        status.textContent = message;
+        status.focus({ preventScroll: true });
+      };
+
+      const query = new URLSearchParams(window.location.search);
+      if (query.get("submitted") === "1") {
+        showStatus(
+          "success",
+          "Application received. The project maintainers will review its technical fit before making contact."
+        );
+      } else if (query.get("error") === "validation") {
+        showStatus("error", "Review the required fields and submit the application again.");
+      } else if (query.get("error") === "rate-limit") {
+        showStatus("error", "Too many applications were submitted from this network. Please wait before trying again.");
+      }
+
+      form.addEventListener("submit", async (event) => {
+        if (!form.reportValidity()) return;
+        event.preventDefault();
+
+        const submit = form.querySelector('button[type="submit"]');
+        if (submit instanceof HTMLButtonElement) submit.disabled = true;
+        showStatus("pending", "Submitting the pilot application…");
+
+        try {
+          const body = new URLSearchParams();
+          for (const [key, value] of new FormData(form)) body.append(key, String(value));
+          const response = await fetch(form.action, {
+            method: "POST",
+            headers: { accept: "application/json" },
+            body,
+            credentials: "same-origin",
+          });
+          const payload = await response.json().catch(() => null);
+          if (!response.ok) {
+            const code = payload?.error?.code;
+            if (response.status === 422 || code === "pilot_validation_failed") {
+              throw new Error("Review the required fields and submit the application again.");
+            }
+            if (response.status === 429 || code === "pilot_rate_limited") {
+              throw new Error("Too many applications were submitted from this network. Please wait before trying again.");
+            }
+            throw new Error("The application could not be accepted right now. Your answers remain in the form so you can retry later.");
+          }
+
+          form.reset();
+          window.history.replaceState({}, "", "/design-partners?submitted=1#apply");
+          showStatus(
+            "success",
+            "Application received. The project maintainers will review its technical fit before making contact."
+          );
+        } catch (error) {
+          showStatus(
+            "error",
+            error instanceof Error
+              ? error.message
+              : "The application could not be accepted right now. Please try again later."
+          );
+        } finally {
+          if (submit instanceof HTMLButtonElement) submit.disabled = false;
+        }
+      });
+    })();
+  </script>
+</SiteLayout>

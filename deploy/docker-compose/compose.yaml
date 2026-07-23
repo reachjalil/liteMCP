@@ -1,20 +1,51 @@
 name: litemcp
 
 services:
+  mongodb-keyfile:
+    image: busybox:1.37.0
+    user: "0:0"
+    environment:
+      MONGODB_REPLICA_SET_KEY: ${MONGODB_REPLICA_SET_KEY:?Set MONGODB_REPLICA_SET_KEY in deploy/docker-compose/.env}
+    command:
+      - sh
+      - -ec
+      - |
+        umask 077
+        printf '%s' "$${MONGODB_REPLICA_SET_KEY}" > /keyfile/keyfile
+        chown 999:999 /keyfile/keyfile
+    restart: "no"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - mongodb-keyfile:/keyfile
+
   mongodb:
     image: mongo:8.0
+    depends_on:
+      mongodb-keyfile:
+        condition: service_completed_successfully
     command:
       - mongod
       - --bind_ip_all
       - --replSet
       - rs0
+      - --auth
+      - --keyFile
+      - /run/mongodb-keyfile/keyfile
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USERNAME:-litemcp}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:?Set MONGODB_PASSWORD in deploy/docker-compose/.env}
     restart: unless-stopped
     stop_grace_period: 30s
     healthcheck:
       test:
         - CMD-SHELL
         - >-
-          mongosh --host 127.0.0.1:27017 --quiet --eval
+          mongosh --host 127.0.0.1:27017 --quiet
+          --username "$$MONGO_INITDB_ROOT_USERNAME"
+          --password "$$MONGO_INITDB_ROOT_PASSWORD"
+          --authenticationDatabase admin --eval
           'try { rs.status().ok } catch (error) {
           rs.initiate({_id:"rs0",members:[{_id:0,host:"mongodb:27017"}]}).ok }'
           | grep -q 1
@@ -24,6 +55,7 @@ services:
       start_period: 10s
     volumes:
       - mongodb-data:/data/db
+      - mongodb-keyfile:/run/mongodb-keyfile:ro
     networks:
       - backend
 
@@ -37,15 +69,31 @@ services:
       mongodb:
         condition: service_healthy
     environment:
+      ANALYTICS_BATCH_SIZE: ${ANALYTICS_BATCH_SIZE:-250}
+      ANALYTICS_ENABLED: ${ANALYTICS_ENABLED:-true}
+      ANALYTICS_FLUSH_INTERVAL_MS: ${ANALYTICS_FLUSH_INTERVAL_MS:-100}
+      ANALYTICS_MAX_QUEUE_SIZE: ${ANALYTICS_MAX_QUEUE_SIZE:-10000}
+      ANALYTICS_RETENTION_DAYS: ${ANALYTICS_RETENTION_DAYS:-90}
       API_ORIGIN: ${API_ORIGIN:-http://localhost:8787}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:8080}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in deploy/docker-compose/.env}
+      CREDENTIAL_MASTER_KEY: ${CREDENTIAL_MASTER_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-}
+      APPROVAL_WEBHOOK_URL: ${APPROVAL_WEBHOOK_URL:-}
       HOST: 0.0.0.0
       LITEMCP_DEMO_MODE: "false"
+      LITEMCP_INSECURE_DEV: "false"
+      LITEMCP_QUOTA_ACTIVE_SESSIONS: ${LITEMCP_QUOTA_ACTIVE_SESSIONS:-9007199254740991}
+      LITEMCP_QUOTA_COMPOSITIONS: ${LITEMCP_QUOTA_COMPOSITIONS:-9007199254740991}
+      LITEMCP_QUOTA_SERVERS: ${LITEMCP_QUOTA_SERVERS:-9007199254740991}
+      LITEMCP_QUOTA_TOOL_CALLS_PER_DAY: ${LITEMCP_QUOTA_TOOL_CALLS_PER_DAY:-9007199254740991}
       MONGODB_DATABASE: litemcp
-      MONGODB_URI: mongodb://mongodb:27017/litemcp?replicaSet=rs0
+      MONGODB_URI: mongodb://${MONGODB_USERNAME:-litemcp}:${MONGODB_PASSWORD:?Set MONGODB_PASSWORD in deploy/docker-compose/.env}@mongodb:27017/litemcp?authSource=admin&replicaSet=rs0
       NODE_ENV: production
       PORT: "8787"
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      SIGNUPS_ENABLED: ${SIGNUPS_ENABLED:-false}
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:8080}
     ports:
       - "${SERVER_PORT:-8787}:8787"
@@ -75,6 +123,8 @@ services:
     build:
       context: ../..
       dockerfile: deploy/docker/web.Dockerfile
+      args:
+        SIGNUPS_ENABLED: ${SIGNUPS_ENABLED:-false}
     restart: unless-stopped
     depends_on:
       server:
@@ -106,3 +156,4 @@ networks:
 
 volumes:
   mongodb-data:
+  mongodb-keyfile:

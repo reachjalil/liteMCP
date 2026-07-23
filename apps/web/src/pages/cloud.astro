@@ -4,46 +4,46 @@ import SectionHeader from "../components/SectionHeader.astro";
 import SiteLayout from "../layouts/SiteLayout.astro";
 ---
 
-<SiteLayout title="Managed cloud" description="Inspect the LiteMCP Composer managed cloud deployment preview, currently implemented with Cloudflare infrastructure and not yet released as a public operated service.">
+<SiteLayout title="Managed cloud" description="Evaluate the invite-only LiteMCP Composer managed-cloud track, its open-core boundary, current deployment evidence, and the acceptance work that remains before a production service.">
   <PageHero
-    eyebrow="Managed cloud · Preview"
-    title="The managed cloud target is open and buildable."
-    description="The Cloudflare-backed Worker bundle, storage adapters, authentication migration, and static site build locally. No authenticated public deployment or operated-service availability is claimed yet."
-    signal="Source preview, not a live service"
+    eyebrow="Managed cloud · Invite only"
+    title="An operated-service track for qualified governance pilots."
+    description="The current managed-cloud work adds private customer lifecycle, entitlement, billing, support-access, provisioning, and fleet-release controls around the same public product core. It is not represented as generally available or production accepted."
+    signal="Pre-1.0 · applications do not create accounts"
   >
     <Fragment slot="actions">
-      <a class="button button--primary button--large" href="/app">Open the local console</a>
-      <a class="button button--large" href="/pricing">Compare distributions</a>
+      <a class="button button--primary button--large" href="/design-partners">Apply for a qualified pilot</a>
+      <a class="button button--large" href="/docs/getting-started#five-minute-proof">Prove the local product first</a>
     </Fragment>
   </PageHero>
 
   <section class="content-section">
     <div class="shell">
       <SectionHeader
-        eyebrow="Intended managed cloud contract"
-        title="Convenience without a closed product fork."
-        description="When the service becomes available, it is intended to operate the same open capability maturity as self-hosting and publish limits that protect shared infrastructure."
+        eyebrow="Managed cloud contract"
+        title="Operated convenience without a self-hosting dependency."
+        description="The service composition consumes public LiteMCP packages. Its private control plane may operate customer lifecycle and commercial service concerns, but self-hosting cannot require it, a vendor account, a license server, billing, mandatory telemetry, or call-home."
       />
       <div class="two-column-cards">
         <article>
-          <p class="eyebrow">Preview</p>
-          <h2>The current management slice</h2>
-          <p>Server registration, composition creation, scoped sessions, policy simulation, approval records, audit, and export are present at preview maturity.</p>
+          <p class="eyebrow">Public product evidence</p>
+          <h2>The governance slice runs locally</h2>
+          <p>Automated loopback proof covers scoped sessions, filtered discovery, allowed and denied execution, exact-context approval, revocation, audit, and payload-free activation evidence.</p>
         </article>
         <article>
-          <p class="eyebrow">Preview</p>
-          <h2>Portable package boundary</h2>
-          <p>Configuration export and shared packages exist. A live import and execution test from managed cloud to Kubernetes has not yet passed.</p>
+          <p class="eyebrow">Private service seam</p>
+          <h2>Customer operations stay out of the public runtime</h2>
+          <p>Qualified intake, account lifecycle, service entitlements, billing records, support grants, provisioning, and fleet rollout belong to the private operated-service boundary.</p>
         </article>
         <article>
-          <p class="eyebrow">Planned</p>
-          <h2>Limits will be published</h2>
-          <p>Request, concurrency, storage, and abuse controls will be documented before general availability. No limits are claimed here before they are set.</p>
+          <p class="eyebrow">Pilot scope</p>
+          <h2>One workflow before a broad rollout</h2>
+          <p>A design-partner pilot starts with multiple MCP servers, one meaningful identity boundary, one sensitive action, and explicit evidence or privacy acceptance criteria.</p>
         </article>
         <article>
-          <p class="eyebrow">Product commitment</p>
-          <h2>Metadata-first operations</h2>
-          <p>Service telemetry should not require tool arguments, tool responses, access tokens, or provider secrets.</p>
+          <p class="eyebrow">Service discipline</p>
+          <h2>Payload-free product analytics</h2>
+          <p>The analytics contract excludes tool arguments, tool results, bearer tokens, raw credentials, emails, and display names. Compliance audit remains a separate, redacted evidence path.</p>
         </article>
       </div>
     </div>
@@ -53,16 +53,20 @@ import SiteLayout from "../layouts/SiteLayout.astro";
     <div class="shell split-layout">
       <div class="split-layout__aside">
         <p class="eyebrow">Current status</p>
-        <h2>Build validation exists; release proof does not.</h2>
+        <h2>An earlier public baseline exists; the current service revision is not production accepted.</h2>
         <p>
-          Wrangler dry-run bundling and the local D1 migration pass. Wrangler was not authenticated,
-          no service was deployed, and no live authentication, API, MCP, or rollback smoke test ran.
+          The public origin previously passed site, Worker, TLS, health, readiness, storage-binding,
+          authentication-routing, and canonical-domain checks. That evidence predates the current
+          managed authority, Insight Plane, and design-partner intake revision and does not prove
+          the current end-to-end service.
         </p>
       </div>
       <div class="legal-note">
-        The current KV product-state adapter is eventually consistent and evaluation-grade for
-        security-sensitive state. Availability, regional placement, fair-use thresholds, durability,
-        and support targets remain unpublished.
+        Privileged onboarding, current MCP initialize/list/call, live named-client and identity-provider
+        runs, cross-target portability, backup/restore, rollback, load, regional behavior, external
+        security review, availability, durability, and support targets remain acceptance work.
+        <a href="/design-partners"> Review pilot fit</a> or inspect the
+        <a href="https://github.com/reachjalil/liteMCP/blob/main/IMPLEMENTATION_STATUS.md"> implementation evidence ↗</a>.
       </div>
     </div>
   </section>

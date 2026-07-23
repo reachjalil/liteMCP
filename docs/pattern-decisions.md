@@ -109,14 +109,15 @@ air-gap smoke tests. Accessibility rules are gates, not optional lint.
 
 ## Reject
 
-### Paid cloud plans and feature gates
+### Product feature gates and self-host license enforcement
 
-The research package's paid SaaS tiers and closed enterprise controls conflict
-with the authoritative brief. LiteMCP Composer will not include checkout,
-usage billing, paid cloud plans, a license server, or source-level enterprise
-feature gates. Revenue comes from installation, migration, supported LTS,
-security response, managed operations in customer environments, training, and
-contractual support/assurance.
+The research package's closed enterprise controls conflict with the open-product
+boundary. LiteMCP Composer will not require a license server, hosted entitlement
+check, or proprietary package to operate the self-hosted product. The separate
+operated service may include checkout, usage billing, hosted plans, customer
+lifecycle management, and service-specific entitlements. Revenue may also come
+from installation, migration, supported LTS, security response, training, and
+contractual support or assurance.
 
 ### Static-key credential encryption
 

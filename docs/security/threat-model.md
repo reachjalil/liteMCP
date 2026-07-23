@@ -30,7 +30,17 @@ This model covers:
 - Cloudflare and Kubernetes deployment shapes;
 - configuration, policy, audit, cache, object, and secret stores.
 
-The portable core depends on a NoSQL DocumentStore port. The initial Cloudflare adapter uses Workers KV; serialization of authorization, policy, provisioning, revocation, and other conflict-sensitive writes through Durable Objects is a planned production control. The Kubernetes adapter uses a MongoDB replica set so conditional updates and multi-document transactions are available. Better Auth uses D1 on Cloudflare and MongoDB on Kubernetes. Better Auth authenticates principals and manages sessions; it is not the authorization boundary. The Hono API and MCP gateway must authorize every protected operation independently.
+The portable core depends on a NoSQL DocumentStore port. The working-tree
+Cloudflare adapter keeps non-authoritative records in Workers KV and routes the
+authorization/execution-sensitive slice through one SQLite Durable Object per
+tenant. That provides per-document serialization, not a transaction across
+documents, D1, KV, or an external dispatch. The Kubernetes adapter uses a
+MongoDB replica set so conditional updates and multi-document transactions are
+available, although current product workflows do not yet wrap state plus audit
+in those transactions. Better Auth uses D1 on Cloudflare and MongoDB on
+Kubernetes. Better Auth authenticates principals and manages sessions; it is
+not the authorization boundary. The Hono API and MCP gateway must authorize
+every protected operation independently.
 
 These documents define intended behavior. At the time of writing, implementation, penetration-test, scale, recovery, and conformance evidence has not been established.
 
@@ -171,9 +181,9 @@ Every adapter must support tenant-scoped reads, conditional write by version, to
 
 ### Cloudflare
 
-- Workers KV is suitable for the MVP configuration/read model, not as proof of linearizable identity or policy writes.
-- Durable Objects are required to serialize per-tenant policy publication, membership/group changes, SCIM mutations, connection refresh/revocation, execution-grant redemption where single use is promised, and emergency deny changes.
-- D1 is the planned Better Auth store and must have tenant-safe session queries, migrations, backups, and restore tests.
+- Workers KV is suitable for non-authoritative configuration/read models, not as proof of linearizable identity or policy writes.
+- The working tree routes current roles/IdPs, server/composition/policy state, sessions/epochs/freeze, approvals, OAuth grants, quotas, service principals, and audit state through a tenant Durable Object. Writes are serialized per document; compound product transitions, SCIM, connected-account refresh, outbox coupling, and external dispatch still need explicit atomicity protocols and proof.
+- D1 is the Better Auth store and must have tenant-safe session queries, migrations, backups, and restore tests.
 - Secrets require an envelope-encryption KeyProvider or external secret manager; KV values must never contain plaintext credential material.
 - Until serialization, invalidation, and multi-region revocation tests pass, the managed cloud deployment on Cloudflare must be labeled development/MVP rather than production-safe for enterprise identity or credential custody.
 
@@ -225,9 +235,18 @@ Each playbook must define containment, revocation scope, evidence preservation, 
 ## Data minimization and privacy
 
 - Tool payload collection is off by default in every edition.
-- Invocation records use stable opaque IDs and record only the metadata needed for authorization, provenance, reliability, quota, and incident response.
+- Invocation analytics uses a strict dimensions-and-measures schema that
+  rejects arguments, results, display names, emails, and unknown fields; byte
+  counts never include the bodies themselves.
+- Invocation records use stable opaque IDs and record only the metadata needed for authorization, provenance, reliability, quota, and incident response. Analytics does not join subject IDs to profile display names.
+- MCP client name/version attribution is self-reported. The first valid value is
+  stored separately from the authorization-session revision and must never be
+  treated as cryptographic client identity or policy authority.
 - External provider identifiers are encrypted or irreversibly hashed where practical.
-- Retention is explicit and operator-configurable; deletion covers primary data, caches, indexes, queued work, and documented backup expiry.
+- Mongo analytics retention is operator-configurable; the managed exact feed is
+  count-capped. Complete audit retention/deletion controls must still cover
+  primary data, caches, indexes, queued work, exports, and documented backup
+  expiry before production readiness.
 - Telemetry is opt-in for self-hosted installations and has no hidden endpoint.
 - Support access, if configured, is time-bound, approved, least-privileged, and audited.
 - Configuration export excludes secrets by default and supports local import without contacting the LiteMCP Composer managed cloud.
@@ -261,7 +280,8 @@ Failures must block production designation. A UI, schema, or untested configurat
 - A self-hosted operator with root, cluster-admin, database-admin, and key access can defeat application controls.
 - Upstream providers and MCP servers can retain submitted data, change behavior, or become compromised.
 - Model prompt injection cannot be eliminated; tool authorization, parameter constraints, approvals, and sandboxing limit impact.
-- Strong, globally bounded revocation on Cloudflare depends on the planned Durable Object design and measured propagation behavior.
+- Strong, globally bounded revocation on Cloudflare depends on deployment of the current Durable Object path plus measured propagation/failure behavior; local adapter tests are not that proof.
+- The gateway performs a final authority/context check immediately before the executor call, but no transaction spans that check and an external network side effect. Freeze or revoke racing after the check can occur after dispatch begins until a linearizable lease/barrier design exists.
 - Whether one-time execution grants are required for all actions or only sensitive actions remains an implementation decision; no single-use claim may be made while backed only by KV.
 - Private-network MCP access weakens default SSRF protections and requires explicit destinations plus deployment-level egress enforcement.
 - Credential export may be impossible when provider tokens are tied to a cloud-operated OAuth application; re-consent must be documented before connection.

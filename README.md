@@ -10,9 +10,13 @@ LiteMCP Composer is an Apache-2.0, MCP-native enterprise composition control
 plane. It composes multiple MCP servers behind one stable endpoint while
 preserving every capability's schema, identity, provenance, version, risk,
 policy, route, and audit context. The same portable TypeScript packages compose
-the managed cloud target—currently implemented with Cloudflare infrastructure—
-and the portable Node target for Docker and Kubernetes. Neither target is
-presented here as a production-proven release.
+the portable Node target for Docker and Kubernetes and the public Cloudflare
+reference composition. The public repository is the complete, independently
+operable product boundary: it requires no proprietary sibling, vendor account,
+license server, billing endpoint, or mandatory call-home. A separately
+maintained proprietary sibling owns the operated hosted service, billing,
+fleet/client operations, and commercial support entitlements. Neither public
+deployment target is presented here as a production-proven release.
 
 ## MCP is the product
 
@@ -28,8 +32,8 @@ objects and journeys:
   `tools/list` and `tools/call`;
 - approval, routing, health, provenance, and audit tied to the exact upstream
   capability and request;
-- portable configuration and behavior across managed cloud, Docker, and
-  Kubernetes.
+- portable configuration and behavior across the Cloudflare reference,
+  Docker, and Kubernetes targets.
 
 The current code proves a focused subset of that model. The implementation
 status names every remaining gap instead of presenting the target architecture
@@ -44,19 +48,30 @@ as shipped behavior.
 
 - Astro 7 public site, Better Auth login, and a dense React management console.
 - Hono control-plane API with versioned schemas, OpenAPI, RFC 9457-style errors,
-  request IDs, tenant authorization, and real create/simulate/session actions.
+  request IDs, tenant authorization, and management lifecycle actions.
 - One MCP Streamable HTTP endpoint composing a built-in calculator and remote
   finance server, including tool aliases and provenance.
 - The same deterministic policy evaluation at `tools/list` and `tools/call`;
   hidden tools stay denied when invoked directly.
 - Short-lived, tenant-scoped MCP session credentials stored only as hashes.
-- Metadata-only, redacted, hash-chained audit records and approval-request
-  creation bound to an argument hash.
-- Portable `DocumentStore` with in-memory, Cloudflare KV, and MongoDB adapters.
+- Metadata-only, redacted, hash-chained audit records and one-shot approvals
+  bound to the complete session/composition/server/policy context and argument
+  hash.
+- A separate fail-open Insight Plane with strict payload-free usage events,
+  client/session attribution, total and upstream latency, tenant-gated JSON/CSV
+  APIs, exact quota standing, Mongo time-series and Cloudflare analytics
+  adapters, and a six-view console. The current revision has local evidence
+  only; client names are self-reported and Cloudflare historical queries are
+  limited to a capped exact feed.
+- MCP OAuth metadata, bounded public-client registration, explicit consent,
+  PKCE, 15-minute access tokens, optional rotating refresh, and revocation,
+  covered locally but not verified with a named client.
+- Portable `DocumentStore` with in-memory and MongoDB adapters plus a
+  Cloudflare reference hybrid of KV and a per-tenant SQLite Durable Object.
 - Better Auth wiring for password sessions, organization membership, MFA
   primitives, bearer/JWT/API-key auth, OIDC/SAML SSO, and SCIM provider
   configuration; live enterprise-provider journeys remain unproven.
-- A managed cloud dry-run bundle built on Cloudflare Workers, KV, D1, and static
+- A Cloudflare reference dry-run bundle built on Workers, KV, D1, and static
   Astro assets; portable Node/Mongo images, Docker Compose configuration, and a
   production-oriented Helm target that lints and renders but has not yet passed
   a live cluster run.
@@ -73,7 +88,9 @@ flowchart LR
   API --> Core["Tenancy · policy · compositions · audit"]
   Gateway --> Core
   Gateway --> Upstreams["Remote HTTP · supervised stdio · built-ins"]
-  Core --> CF["Cloudflare KV + D1"]
+  Gateway --> Insight["Payload-free usage analytics"]
+  API --> Insight
+  Core --> CF["Cloudflare KV + Durable Objects + D1"]
   Core --> K8s["Kubernetes + MongoDB"]
 ```
 
@@ -96,54 +113,113 @@ LITEMCP_DEMO_MODE=true pnpm dev
 
 Open [http://localhost:4321](http://localhost:4321), then choose **Open console**.
 The demo is visibly labeled and sends fixed `org_demo` authorization headers;
-it is disabled by default in production configurations.
+it is disabled by default in production configurations, where the demo toggle
+is not rendered.
 
-In another terminal, prove that two different upstream transports are exposed
-through one scoped endpoint:
+To prove the governed endpoint without keeping two terminals open, run:
+
+```bash
+pnpm demo:smoke
+```
+
+This starts a real loopback Node server, asserts filtered discovery, builtin and
+remote execution, hidden denial, approval pause/resume, redacted audit evidence,
+activation semantics, and revocation, then always cleans up the server.
+
+Agent configuration is generated from the reviewed `.harness` source for both
+Codex (`.agents`) and Claude (`.claude`). On a fresh checkout, or after pulling
+a change that touches `.harness`, regenerate the ignored live surfaces:
+
+```bash
+pnpm setup:harness
+```
+
+For changes to agent instructions, skills, or profiles, edit `.harness`, run
+`pnpm harness:validate`, preview with `pnpm harness:preview`, then apply only
+after reviewing the plan with `pnpm harness:activate`. A second preview must
+converge to stable `keep` actions. Select a temporary focus without changing the
+skill catalog:
+
+```bash
+pnpm harness:profile:list
+pnpm harness:profile security
+pnpm harness:preview
+pnpm harness:activate
+pnpm harness:preview
+pnpm harness:profile:clear
+pnpm harness:preview
+pnpm harness:activate
+pnpm harness:preview
+```
+
+The available profiles focus agents on security, deployment, release,
+observability, identity, MCP compatibility, open-core boundaries, or fast
+vertical-slice iteration. The selector `.harnessProfile` is local and
+intentionally not committed.
+
+The same proof can be run manually against the interactive server:
 
 ```bash
 pnpm --filter @litemcp/example-local-composition dev
 ```
 
-The example creates a ten-minute employee session, negotiates MCP, lists the
-policy-filtered catalog, calls the `sum` alias, and calls
-`finance.list_invoices`. A direct attempt to call the hidden refund tool is
-denied and audited by the gateway tests.
+The example creates scoped employee and finance sessions, negotiates MCP, lists
+the policy-filtered catalog, calls both transports, denies a hidden tool, pauses
+and resumes an approval-gated action, checks redacted audit evidence, and proves
+session revocation. This is repository wire evidence, not named-client
+certification.
 
 Useful API surfaces:
 
 - `GET /health` and `GET /ready`
 - `GET /api/v1/openapi.json`
 - `GET /api/v1/overview`
+- `GET /api/v1/analytics/summary`
+- `GET /api/v1/usage`
 - `POST /api/v1/policy/simulate`
 - `POST /api/v1/sessions`
 - `POST /mcp/:tenantId/:compositionSlug`
 
+See [`docs/usage-observability.md`](./docs/usage-observability.md) for the
+analytics/audit boundary, storage limits, query semantics, and unproved
+acceptance work.
+
 ## Deployment
 
-### Managed cloud
+### Cloudflare reference composition
 
-The public managed-cloud preview is live at
+The public preview is live at
 [`litemcpcomposer.com`](https://litemcpcomposer.com). It currently uses
-Cloudflare Workers to serve the static Astro site and API on one origin.
-Product records use Workers KV, and Better Auth uses D1. Those provider details
-remain confined to this composition root and `packages/adapter-cloudflare`.
+Cloudflare Workers to serve the static Astro site and API on one origin. The
+current working tree keeps non-authoritative records in Workers KV, routes the
+security-sensitive product slice through a per-tenant SQLite Durable Object,
+and stores Better Auth data in D1. Those working-tree authority changes are not
+deployed to the recorded public preview. Provider details remain confined to
+this composition root and `packages/adapter-cloudflare`. The source here is an
+Apache-licensed historical/reference composition, not the proprietary
+sibling's operated-service configuration. These commands deploy into an
+operator-owned Cloudflare account and do not grant hosted-service support.
 
 ```bash
 pnpm --filter @litemcp/managed-cloud db:migrate:local
 pnpm managed-cloud:dev
 ```
 
-For a fresh account, authenticate Wrangler and upload an inactive Worker
-version first. The version upload provisions the draft KV and D1 bindings
-without directing production traffic to an unmigrated database:
+For a fresh account, create the account-owned KV and D1 resources explicitly,
+check in their reviewed IDs, and apply the Durable Object lifecycle with
+`wrangler deploy` from the exact verified CI payload. Cloudflare does not allow
+a first deployment or a pending Durable Object lifecycle migration through
+`wrangler versions upload`. The lifecycle operation requires secure first-deploy
+secrets and a full maintenance/write-freeze boundary; follow the dedicated
+[Durable Object lifecycle runbook](./docs/operations/cloudflare-durable-object-lifecycle.md).
+After that runbook's remote check passes, configure the runtime secrets and D1
+schema for the explicit target:
 
 ```bash
 pnpm --filter @litemcp/managed-cloud exec wrangler login
 pnpm --filter @litemcp/managed-cloud exec wrangler whoami
-pnpm --filter @litemcp/web build
-pnpm --filter @litemcp/managed-cloud exec wrangler versions upload
-pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put BETTER_AUTH_SECRET
+pnpm managed-cloud:do-lifecycle -- --env production
+pnpm --filter @litemcp/managed-cloud exec wrangler versions secret put BETTER_AUTH_SECRET --env=
 pnpm --filter @litemcp/managed-cloud db:migrate:remote
 ```
 
@@ -154,28 +230,47 @@ name `litemcpcomposer.com`. Then deploy and smoke-test the site, auth, API, and
 a scoped MCP session:
 
 ```bash
-pnpm managed-cloud:deploy
+pnpm --filter @litemcp/managed-cloud exec wrangler triggers deploy --env=
+# Then dispatch deploy-managed-cloud-staging.yml and promote its accepted SHA
+# with deploy-managed-cloud.yml.
 ```
 
-The upload/deploy commands are external mutations, not validation commands. A
-production rollout also needs the stronger serialized mutation boundary
-described in the known limitations.
+Worker version promotion intentionally does not manage routes/custom domains;
+apply trigger changes as their own reviewed mutation and verify DNS/TLS plus the
+exact origin before setting a resource-ready marker. The marker also attests
+that the separately applied lifecycle operation reached the final checked-in
+migration tag; every promotion verifies that state remotely before upload.
 
-After one-time resource bootstrap, `.github/workflows/deploy-managed-cloud.yml`
-can deploy green `main` checkpoints when the protected GitHub environment has
-Cloudflare credentials, an exact HTTPS origin, and the explicit resource-ready
-and auto-deploy variables. It remains disabled until those values are supplied.
+The upload/deploy commands are external mutations, not validation commands. A
+production rollout must apply and accept the current Durable Object/D1
+migrations; per-document serialization does not remove the multi-document and
+external-dispatch limits described in the known limitations.
+
+After the one-time lifecycle/resource bootstrap,
+`.github/workflows/deploy-managed-cloud-staging.yml` can deploy an exact
+main-branch SHA only after the matching CI run succeeds. Staging requires both
+public health/readiness and an authenticated read-only MCP smoke, then retains
+non-secret acceptance evidence. Production promotion is an explicit dispatch
+of `.github/workflows/deploy-managed-cloud.yml` with that exact SHA and staging
+run ID; it verifies the evidence before entering the production environment
+declared by the workflow. Both workflows remain disabled until the
+customer-owned reference deployment variables, resource IDs, credentials,
+origins, and smoke tuple are configured. GitHub environment reviewers,
+deployment-branch policies, and the `Required checks` branch rule are
+repository-admin controls: this repository validates the workflow contract,
+but the current upstream repository has not configured those remote protections.
 
 ### Docker Compose
 
 ```bash
 cp deploy/docker-compose/.env.example deploy/docker-compose/.env
-# Replace BETTER_AUTH_SECRET in the copied file.
+# Replace every placeholder secret, including the MongoDB password/keyfile.
 pnpm docker:up
 ```
 
 The console is at `http://localhost:8080`; it reverse-proxies API, auth, and MCP
-traffic to the Node service. MongoDB runs as a local replica set. See
+traffic to the Node service. MongoDB runs as an authenticated single-member
+replica set for local evaluation. See
 [`docs/on-prem/installation.md`](./docs/on-prem/installation.md).
 
 ### Kubernetes
@@ -198,7 +293,7 @@ upgrade runbooks under `docs/on-prem`.
 
 | Area | Purpose | Guide |
 | --- | --- | --- |
-| `apps` | Deployable website, managed cloud, and portable server | [`apps/README.md`](./apps/README.md) |
+| `apps` | Deployable website, Cloudflare reference, and portable server | [`apps/README.md`](./apps/README.md) |
 | `packages` | Portable product capabilities and infrastructure adapters | [`packages/README.md`](./packages/README.md) |
 | `deploy` | Docker Compose, container images, and Kubernetes/Helm | [`deploy/README.md`](./deploy/README.md) |
 | `examples` | Runnable SDK and MCP composition examples | [`examples/README.md`](./examples/README.md) |
@@ -208,7 +303,7 @@ upgrade runbooks under `docs/on-prem`.
 
 ```text
 apps/web                 Astro public site, login, and console
-apps/managed-cloud       Managed cloud deployment, currently on Cloudflare
+apps/managed-cloud       Historical Apache Cloudflare reference composition
 apps/server              Portable Node/Mongo composition root
 packages/contracts       Zod domain and API contracts
 packages/core            Platform service, policy, security, audit
@@ -226,19 +321,45 @@ deploy                   Docker Compose, images, and Helm chart
 
 ```bash
 pnpm check
+pnpm python:test
+pnpm harness:ci
+pnpm security:audit
+pnpm security:audit:all
+pnpm ci:policy
+pnpm managed-cloud:auth-schema:check
+pnpm auth:migrate:mongodb:self-test
 pnpm helm:lint
 pnpm helm:template
 ```
 
-CI installs with a frozen lockfile, checks formatting and types, runs unit and
-integration tests, builds every package, validates the managed cloud Wrangler
-dry-run bundle, and renders Docker Compose and Helm configuration. A separate
-workflow publishes validated edge images to GHCR after CI; the implementation
-status records whether that remote workflow has actually passed. Kubernetes
-runtime smoke coverage is intentionally not overstated.
+CI installs with a frozen lockfile, checks formatting/types, runs TypeScript and
+Python SDK tests, builds every package, applies and converges Harness config in
+the disposable checkout, enforces production dependency and workflow policy
+gates, proves Better Auth's generated D1 schema and guarded MongoDB upgrade
+planner, validates local D1 migrations plus Cloudflare dry runs, scans secrets,
+dependencies, and exact container digests, and renders Docker Compose and Helm configuration. A single
+required-check aggregator prevents an optional/skipped job from masking a
+failed mandatory gate. The full dependency graph allows only reviewed,
+path-bound, expiring exceptions in
+`.github/dependency-audit-allowlist.json`; production dependencies have no such
+exception. Canonical-repository main CI pushes run-and-attempt-qualified
+candidate images with SBOM and provenance, scans their exact digests, and
+retains run-bound evidence; forks still build and scan both images locally
+without attempting to write the upstream registry. A serialized publisher then
+promotes those digests without rebuilding, refuses to supersede a newer
+successful main run when qualification or the immediate pre-`edge` freshness
+check observes one, refuses to change an existing `sha-<commit>` alias to
+another digest, and verifies that alias plus `edge` after each registry write.
+GHCR cannot atomically update the server and web repositories, so a partial
+`edge` update and the residual API-read/registry-write race remain visible,
+rerunnable operational boundaries. The
+implementation status records whether this new remote workflow has actually
+passed. Kubernetes runtime smoke coverage is intentionally not overstated.
 
 ## Product and security documentation
 
+- [`OPEN_CORE.md`](./OPEN_CORE.md)
+- [`docs/adr/0001-open-product-core-hosted-control-plane.md`](./docs/adr/0001-open-product-core-hosted-control-plane.md)
 - [`docs/product-requirements.md`](./docs/product-requirements.md)
 - [`docs/feature-reference.md`](./docs/feature-reference.md)
 - [`docs/requirements-traceability.md`](./docs/requirements-traceability.md)
@@ -246,6 +367,8 @@ runtime smoke coverage is intentionally not overstated.
 - [`docs/mcp-composition-lifecycle.md`](./docs/mcp-composition-lifecycle.md)
 - [`docs/console-guide.md`](./docs/console-guide.md)
 - [`docs/api-and-sdk-reference.md`](./docs/api-and-sdk-reference.md)
+- [`docs/mcp-client-compatibility.md`](./docs/mcp-client-compatibility.md)
+- [`docs/managed-cloud-fair-use.md`](./docs/managed-cloud-fair-use.md)
 - [`docs/configuration-reference.md`](./docs/configuration-reference.md)
 - [`docs/operations/runbook.md`](./docs/operations/runbook.md)
 - [`docs/connector-authoring.md`](./docs/connector-authoring.md)
@@ -260,13 +383,21 @@ runtime smoke coverage is intentionally not overstated.
 - [`docs/pattern-audit.md`](./docs/pattern-audit.md)
 - [`docs/pattern-decisions.md`](./docs/pattern-decisions.md)
 
-## Open source and commercial model
+## Open product and hosted-service model
 
-The current product and its full capability roadmap are Apache-2.0. The managed
-cloud is intended to remain free under future published fair-use limits, and
-self-hosting remains free. Commercial offerings may eventually provide
-deployment, operations, migration, training, incident response, support, and
-future LTS/SLA commitments—never a closed enterprise feature gate.
+The public Apache-2.0 repository is the complete, independently operable
+product boundary. "Complete" describes that self-hosting does not depend on
+private code, a service account, license or billing endpoints, or mandatory
+call-home; it does not overstate the pre-1.0 implementation status. A separately
+maintained proprietary sibling owns the operated service, billing and metering,
+fleet and managed-client operations, commercial support grants and
+entitlements, and SLA/on-call/compliance work. It may depend on the public
+product; the public product must not depend on it.
+
+All source already published here—including `apps/managed-cloud`—keeps its
+Apache-2.0 grant. Later movement, replacement, or removal cannot revoke the
+license for historical revisions. See [`OPEN_CORE.md`](./OPEN_CORE.md) for the
+boundary and its governing ADR.
 
 See [`CONTRIBUTING.md`](./CONTRIBUTING.md), [`SECURITY.md`](./SECURITY.md), and
 [`GOVERNANCE.md`](./GOVERNANCE.md). The shorter `liteMCP` repository name has

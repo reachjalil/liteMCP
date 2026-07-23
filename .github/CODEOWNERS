@@ -1,0 +1,11 @@
+# Default ownership and explicit high-risk boundaries.
+* @reachjalil
+
+/.github/workflows/ @reachjalil
+/.harness/ @reachjalil
+/SECURITY.md @reachjalil
+/OPEN_CORE.md @reachjalil
+/packages/auth/ @reachjalil
+/packages/core/ @reachjalil
+/packages/storage/ @reachjalil
+/deploy/ @reachjalil

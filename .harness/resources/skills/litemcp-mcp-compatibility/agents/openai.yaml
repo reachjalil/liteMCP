@@ -1,0 +1,4 @@
+interface:
+  display_name: "LiteMCP MCP Compatibility"
+  short_description: "Verify protocol and client behavior"
+  default_prompt: "Use $litemcp-mcp-compatibility to verify this MCP protocol or client compatibility change."

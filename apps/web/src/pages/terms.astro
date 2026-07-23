@@ -1,0 +1,125 @@
+---
+import PageHero from "../components/PageHero.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+---
+
+<SiteLayout title="Terms of Service" description="Terms governing invited use of the LiteMCP Composer managed-cloud preview; a design-partner application is not service acceptance, and self-hosted software remains governed by Apache 2.0.">
+  <PageHero
+    eyebrow="Legal · Invite-only managed preview"
+    title="Terms of Service"
+    description="These terms govern the hosted LiteMCP Composer preview. They do not replace the Apache-2.0 license for software you run yourself."
+    signal="Effective 22 July 2026"
+  >
+    <Fragment slot="actions">
+      <a class="button button--primary button--large" href="/privacy">Privacy policy</a>
+      <a class="button button--large" href="/security">Security model</a>
+    </Fragment>
+  </PageHero>
+
+  <section class="content-section">
+    <div class="shell">
+      <article class="prose">
+        <p>
+          These Terms of Service (the “Terms”) apply when you access the hosted service at
+          <code>litemcpcomposer.com</code> or another LiteMCP Composer managed-cloud endpoint
+          (the “Service”). By creating an account, accepting an invitation, or using the
+          Service, you agree to these Terms. If you use the Service for an organization, you
+          confirm that you may accept these Terms for that organization.
+        </p>
+        <p>
+          Submitting a design-partner application does not create an account, accept these Terms
+          on behalf of an organization, guarantee an invitation, place an order, or create a paid
+          service, SLA, or production commitment.
+        </p>
+
+        <h2 id="preview">1. Preview status</h2>
+        <p>
+          The Service is an invite-only pre-1.0 preview. Self-service registration is disabled by
+          default, access may be paused, features may change, and no uptime, support,
+          regional-hosting, retention, or recovery service level is promised. Do not rely on the
+          preview for production, safety-critical, or regulated workloads. Current limitations are
+          published with the source repository.
+        </p>
+
+        <h2 id="accounts">2. Accounts and organizations</h2>
+        <p>
+          You must provide accurate account information, protect authentication factors and
+          recovery links, and promptly report suspected compromise. Organization owners are
+          responsible for invitations, member access, configured identity providers, policies,
+          upstream MCP servers, and activity performed through credentials they issue. You may
+          not transfer or share an individual account in a way that defeats access controls.
+        </p>
+
+        <h2 id="acceptable-use">3. Acceptable use</h2>
+        <p>You may not use the Service to:</p>
+        <ul>
+          <li>break the law, infringe rights, or facilitate fraud, harassment, or abuse;</li>
+          <li>access accounts, systems, MCP servers, tools, or data without authorization;</li>
+          <li>introduce malware, evade security controls, probe other tenants, or disrupt availability;</li>
+          <li>send spam or use invitations, email, or API traffic for unsolicited campaigns;</li>
+          <li>circumvent published quotas, rate limits, signup controls, or technical safeguards; or</li>
+          <li>submit secrets or sensitive regulated data when the preview is not documented as supporting that use.</li>
+        </ul>
+        <p>
+          We may rate-limit, suspend, or block activity reasonably believed to threaten the
+          Service, another tenant, an upstream provider, or the public. Current preview defaults
+          are 5 servers, 5 compositions, 25 active sessions, and 1,000 tool calls per organization
+          per UTC day. These product quotas do not promise infrastructure rate limits, capacity,
+          availability, or an SLA.
+        </p>
+
+        <h2 id="content">4. Your configuration and content</h2>
+        <p>
+          You retain rights in configuration and content you submit. You give the Service the
+          limited permission needed to host, transmit, validate, secure, back up, and otherwise
+          process that material to provide the features you request. You are responsible for
+          having the rights and authority to connect each upstream system and process its data.
+        </p>
+        <p>
+          Tool calls are routed to MCP servers you choose. Those servers and their providers
+          have their own terms and privacy practices; LiteMCP Composer does not control their
+          behavior. Review tool visibility, policy, and arguments before allowing an agent to
+          invoke a tool.
+        </p>
+
+        <h2 id="open-source">5. Open-source software</h2>
+        <p>
+          The repository and distributable software are licensed under Apache License 2.0 as
+          stated in the repository. These Terms govern only the operated Service and do not add
+          a license server, mandatory call-home requirement, or hosted-service dependency to a
+          self-hosted deployment.
+        </p>
+
+        <h2 id="suspension">6. Suspension and termination</h2>
+        <p>
+          You may stop using the Service at any time. We may suspend or terminate access for a
+          material breach, security risk, unlawful use, or operation of the preview. Where
+          practical, we will provide notice and a reasonable opportunity to export configuration
+          before a non-urgent shutdown. Emergency security action may be immediate.
+        </p>
+
+        <h2 id="warranty">7. Disclaimers and responsibility</h2>
+        <p>
+          To the fullest extent permitted by law, the invite-only preview is provided “as is” and “as
+          available,” without warranties of availability, fitness, non-infringement, or error-free
+          operation. Nothing in these Terms excludes liability or consumer rights that cannot
+          lawfully be excluded. No paid plan or contractual SLA is offered under these preview
+          Terms. Any future paid service will require separately published operator identity,
+          pricing, billing and refund terms, governing law, and service commitments.
+        </p>
+
+        <h2 id="changes">8. Changes and contact</h2>
+        <p>
+          We may update these Terms as the Service matures. Material changes will receive a new
+          effective date and, when accounts are open, reasonable in-product or email notice.
+          Continued use after the change takes effect means you accept the updated Terms.
+        </p>
+        <p>
+          Questions about these Terms can be sent to
+          <a href="mailto:enterprise@litemcpcomposer.com?subject=LiteMCP%20Composer%20terms">enterprise@litemcpcomposer.com</a>.
+          Security reports should use the private channel linked from the <a href="/security">security page</a>.
+        </p>
+      </article>
+    </div>
+  </section>
+</SiteLayout>

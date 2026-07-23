@@ -1,13 +1,33 @@
-import type { GatewaySession, McpServerDefinition, Subject } from "@litemcp/contracts";
+import type {
+  ApprovalRequest,
+  GatewaySession,
+  McpServerDefinition,
+  SessionClientInfo,
+  Subject,
+} from "@litemcp/contracts";
 import {
+  type AuditReceipt,
   PlatformAuthorizationError,
+  PlatformConflictError,
   PlatformNotFoundError,
+  PlatformPolicyDeniedError,
+  PlatformQuotaError,
   type PlatformService,
   type ResolvedTool,
   randomId,
 } from "@litemcp/core";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
+
+import {
+  ipFamily,
+  isDemoPrivateIpAddress,
+  isPublicIpAddress,
+  isSpecialHostname,
+  normalizeHostname,
+} from "./network-security.js";
+
+export * from "./network-security.js";
 
 export const MCP_PROTOCOL_VERSION = "2025-11-25";
 
@@ -102,6 +122,21 @@ export type ExecutionContext = {
   tenantId: string;
   session: GatewaySession;
   signal?: AbortSignal;
+  onUpstreamMeasurement?: (measurement: UpstreamMeasurement) => void;
+};
+
+export type ProbeContext = {
+  requestId: string;
+  signal?: AbortSignal;
+  onUpstreamMeasurement?: (measurement: UpstreamMeasurement) => void;
+};
+
+export type UpstreamMeasurement = {
+  latencyMs: number;
+  requestBytes: number;
+  responseBytes: number;
+  httpStatus?: number;
+  errorCode?: "timeout" | "transport_error" | "http_error" | "protocol_error";
 };
 
 export interface UpstreamExecutor {
@@ -112,6 +147,10 @@ export interface UpstreamExecutor {
     args: Record<string, unknown>,
     context: ExecutionContext
   ): Promise<ToolExecutionResult>;
+  probe?(
+    server: McpServerDefinition,
+    context: ProbeContext
+  ): Promise<{ tools: McpServerDefinition["tools"]; serverVersion?: string }>;
 }
 
 export class BuiltinExecutor implements UpstreamExecutor {
@@ -141,71 +180,11 @@ export class BuiltinExecutor implements UpstreamExecutor {
     }
     throw new Error(`No builtin implementation for ${server.slug}.${toolName}.`);
   }
+
+  async probe(server: McpServerDefinition) {
+    return { tools: server.tools, serverVersion: server.version };
+  }
 }
-
-const isPrivateIpv4 = (hostname: string) => {
-  const parts = hostname.split(".").map(Number);
-  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part))) {
-    return false;
-  }
-  const [a = 0, b = 0, c = 0] = parts;
-  return (
-    a === 10 ||
-    a === 127 ||
-    a >= 224 ||
-    (a === 100 && b >= 64 && b <= 127) ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 0 && (c === 0 || c === 2)) ||
-    (a === 192 && b === 168) ||
-    (a === 198 && (b === 18 || b === 19)) ||
-    (a === 198 && b === 51 && c === 100) ||
-    (a === 203 && b === 0 && c === 113) ||
-    a === 0
-  );
-};
-
-const ipv6Hextets = (hostname: string) => {
-  if (!hostname.includes(":")) return null;
-  const halves = hostname.split("::");
-  if (halves.length > 2) return null;
-  const left = halves[0]?.split(":").filter(Boolean) ?? [];
-  const right = halves[1]?.split(":").filter(Boolean) ?? [];
-  const missing = 8 - left.length - right.length;
-  if ((halves.length === 1 && missing !== 0) || missing < 0) return null;
-  const values = [
-    ...left,
-    ...Array.from({ length: halves.length === 2 ? missing : 0 }, () => "0"),
-    ...right,
-  ].map((part) => Number.parseInt(part, 16));
-  if (
-    values.length !== 8 ||
-    values.some((value) => !Number.isInteger(value) || value < 0 || value > 0xffff)
-  ) {
-    return null;
-  }
-  return values;
-};
-
-const isPrivateIpv6 = (hostname: string) => {
-  const values = ipv6Hextets(hostname);
-  if (!values) return false;
-  const first = values[0] ?? 0;
-  const allZeroPrefix = values.slice(0, 6).every((value) => value === 0);
-  const mappedIpv4 =
-    values.slice(0, 5).every((value) => value === 0) && values[5] === 0xffff;
-  if (mappedIpv4) {
-    const high = values[6] ?? 0;
-    const low = values[7] ?? 0;
-    return isPrivateIpv4(`${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`);
-  }
-  // Unspecified, loopback, and deprecated IPv4-compatible forms are never
-  // valid remote service destinations.
-  if (allZeroPrefix) return true;
-  // Permit only global-unicast literals (2000::/3). This intentionally fails
-  // closed for ULA, link/site-local, multicast, and other special-use ranges.
-  return (first & 0xe000) !== 0x2000;
-};
 
 export const validateRemoteEndpoint = (
   endpoint: string,
@@ -218,18 +197,19 @@ export const validateRemoteEndpoint = (
   if (url.username || url.password || url.hash) {
     throw new Error("Upstream URLs cannot contain credentials or fragments.");
   }
-  const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  const privateHost =
-    hostname === "localhost" ||
-    hostname.endsWith(".localhost") ||
-    hostname.endsWith(".local") ||
-    hostname.endsWith(".internal") ||
-    hostname.endsWith(".localdomain") ||
-    hostname.endsWith(".home.arpa") ||
-    hostname === "::1" ||
-    isPrivateIpv6(hostname) ||
-    isPrivateIpv4(hostname);
-  if (privateHost && !options.allowPrivateNetwork) {
+  const hostname = normalizeHostname(url.hostname);
+  const family = ipFamily(hostname);
+  const allowedLiteral =
+    family === 0 ||
+    isPublicIpAddress(hostname) ||
+    (options.allowPrivateNetwork && isDemoPrivateIpAddress(hostname));
+  if (
+    (!allowedLiteral || (family === 0 && isSpecialHostname(hostname))) &&
+    !options.allowPrivateNetwork
+  ) {
+    throw new Error("Private-network upstream URLs are blocked by default.");
+  }
+  if (family !== 0 && !allowedLiteral) {
     throw new Error("Private-network upstream URLs are blocked by default.");
   }
   if (url.protocol !== "https:" && !options.allowPrivateNetwork) {
@@ -252,12 +232,12 @@ export class RemoteHttpExecutor implements UpstreamExecutor {
     return server.transport === "streamable-http" || server.transport === "legacy-sse";
   }
 
-  async execute(
+  async #request(
     server: McpServerDefinition,
-    toolName: string,
-    args: Record<string, unknown>,
-    context: ExecutionContext
-  ): Promise<ToolExecutionResult> {
+    method: string,
+    params: Record<string, unknown> | undefined,
+    context: ProbeContext
+  ) {
     if (!server.endpoint) throw new Error("Remote server endpoint is missing.");
     const endpoint = validateRemoteEndpoint(server.endpoint, this.options);
     const timeout = AbortSignal.timeout(this.options.timeoutMs ?? 20_000);
@@ -265,56 +245,189 @@ export class RemoteHttpExecutor implements UpstreamExecutor {
       ? AbortSignal.any([context.signal, timeout])
       : timeout;
     const upstreamRequestId = randomId("upstream");
-    const response = await this.fetchImplementation(endpoint, {
-      method: "POST",
-      headers: {
-        accept: "application/json, text/event-stream",
-        "content-type": "application/json",
-        "mcp-protocol-version": MCP_PROTOCOL_VERSION,
-        "x-request-id": context.requestId,
-      },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: upstreamRequestId,
-        method: "tools/call",
-        params: { name: toolName, arguments: args },
-      }),
-      redirect: "error",
-      signal,
+    const requestBody = JSON.stringify({
+      jsonrpc: "2.0",
+      id: upstreamRequestId,
+      method,
+      ...(params ? { params } : {}),
     });
-    if (!response.ok) {
-      throw new Error(`Upstream returned HTTP ${response.status}.`);
-    }
-    const maxResponseBytes = this.options.maxResponseBytes ?? 4 * 1024 * 1024;
-    const advertisedLength = Number(response.headers.get("content-length") ?? "0");
-    if (advertisedLength > maxResponseBytes) {
-      throw new Error("Upstream MCP response exceeded its byte limit.");
-    }
-    const responseBytes = await response.arrayBuffer();
-    if (responseBytes.byteLength > maxResponseBytes) {
-      throw new Error("Upstream MCP response exceeded its byte limit.");
-    }
-    let payload: {
-      result?: ToolExecutionResult;
-      error?: { message?: string };
-    };
+    const requestBytes = new TextEncoder().encode(requestBody).byteLength;
+    const startedAt = performance.now();
+    let measuredResponseBytes = 0;
+    let httpStatus: number | undefined;
+    let errorCode: UpstreamMeasurement["errorCode"];
     try {
-      payload = JSON.parse(new TextDecoder().decode(responseBytes)) as typeof payload;
-    } catch {
-      throw new Error("Upstream returned invalid JSON-RPC output.");
+      const response = await this.fetchImplementation(endpoint, {
+        method: "POST",
+        headers: {
+          accept: "application/json, text/event-stream",
+          "content-type": "application/json",
+          "mcp-protocol-version": MCP_PROTOCOL_VERSION,
+          "x-request-id": context.requestId,
+        },
+        body: requestBody,
+        redirect: "error",
+        signal,
+      });
+      httpStatus = response.status;
+      if (!response.ok) {
+        errorCode = "http_error";
+        throw new Error(`Upstream returned HTTP ${response.status}.`);
+      }
+      const maxResponseBytes = this.options.maxResponseBytes ?? 4 * 1024 * 1024;
+      const advertisedLength = Number(response.headers.get("content-length") ?? "0");
+      if (advertisedLength > maxResponseBytes) {
+        errorCode = "protocol_error";
+        throw new Error("Upstream MCP response exceeded its byte limit.");
+      }
+      const responseBytes = await response.arrayBuffer();
+      measuredResponseBytes = responseBytes.byteLength;
+      if (responseBytes.byteLength > maxResponseBytes) {
+        errorCode = "protocol_error";
+        throw new Error("Upstream MCP response exceeded its byte limit.");
+      }
+      let payload: { result?: unknown; error?: { message?: string } };
+      try {
+        payload = JSON.parse(new TextDecoder().decode(responseBytes)) as typeof payload;
+      } catch {
+        errorCode = "protocol_error";
+        throw new Error("Upstream returned invalid JSON-RPC output.");
+      }
+      if (payload.error) {
+        errorCode = "protocol_error";
+        throw new Error(payload.error.message ?? "Upstream MCP request failed.");
+      }
+      return payload.result;
+    } catch (error) {
+      if (!errorCode) {
+        errorCode =
+          error instanceof Error &&
+          (error.name === "TimeoutError" || error.name === "AbortError")
+            ? "timeout"
+            : "transport_error";
+      }
+      throw error;
+    } finally {
+      try {
+        context.onUpstreamMeasurement?.({
+          latencyMs: Math.max(0, performance.now() - startedAt),
+          requestBytes,
+          responseBytes: measuredResponseBytes,
+          ...(httpStatus !== undefined ? { httpStatus } : {}),
+          ...(errorCode ? { errorCode } : {}),
+        });
+      } catch {
+        // Measurement collection is analytics-only and cannot affect dispatch.
+      }
     }
-    if (payload.error) {
-      throw new Error(payload.error.message ?? "Upstream MCP execution failed.");
+  }
+
+  async probe(server: McpServerDefinition, context: ProbeContext) {
+    const initialized = (await this.#request(
+      server,
+      "initialize",
+      {
+        protocolVersion: MCP_PROTOCOL_VERSION,
+        capabilities: {},
+        clientInfo: { name: "LiteMCP Composer Probe", version: "0.1.0" },
+      },
+      context
+    )) as { protocolVersion?: unknown; serverInfo?: { version?: unknown } } | undefined;
+    if (typeof initialized?.protocolVersion !== "string") {
+      throw new Error("Upstream initialize response is invalid.");
     }
-    if (!payload.result?.content) {
+    const listed = (await this.#request(server, "tools/list", undefined, context)) as
+      | { tools?: unknown }
+      | undefined;
+    if (!Array.isArray(listed?.tools) || listed.tools.length > 1_000) {
+      throw new Error(
+        "Upstream tools/list response is invalid or exceeds 1,000 tools."
+      );
+    }
+    const tools = listed.tools.map((entry, index) => {
+      if (!entry || typeof entry !== "object") {
+        throw new Error(`Upstream tool ${index} is invalid.`);
+      }
+      const tool = entry as {
+        name?: unknown;
+        title?: unknown;
+        description?: unknown;
+        inputSchema?: unknown;
+        annotations?: {
+          readOnlyHint?: unknown;
+          destructiveHint?: unknown;
+          idempotentHint?: unknown;
+        };
+      };
+      if (
+        typeof tool.name !== "string" ||
+        tool.name.length < 1 ||
+        tool.name.length > 160 ||
+        !tool.inputSchema ||
+        typeof tool.inputSchema !== "object" ||
+        Array.isArray(tool.inputSchema)
+      ) {
+        throw new Error(`Upstream tool ${index} has an invalid name or input schema.`);
+      }
+      const destructive = tool.annotations?.destructiveHint === true;
+      return {
+        name: tool.name,
+        title:
+          typeof tool.title === "string" && tool.title.length > 0
+            ? tool.title.slice(0, 160)
+            : tool.name,
+        description:
+          typeof tool.description === "string"
+            ? tool.description.slice(0, 2_000)
+            : "Imported from upstream MCP discovery.",
+        inputSchema: tool.inputSchema as Record<string, unknown>,
+        // Discovery metadata is controlled by the upstream. It may raise the
+        // risk classification, but only an administrator can downgrade a tool
+        // to read-only or mark it retry-safe through PATCH /servers/:id.
+        risk: destructive ? ("destructive" as const) : ("write" as const),
+        readOnly: false,
+        idempotent: false,
+      };
+    });
+    return {
+      tools,
+      ...(typeof initialized.serverInfo?.version === "string"
+        ? { serverVersion: initialized.serverInfo.version }
+        : {}),
+    };
+  }
+
+  async execute(
+    server: McpServerDefinition,
+    toolName: string,
+    args: Record<string, unknown>,
+    context: ExecutionContext
+  ): Promise<ToolExecutionResult> {
+    const result = (await this.#request(
+      server,
+      "tools/call",
+      { name: toolName, arguments: args },
+      context
+    )) as ToolExecutionResult | undefined;
+    if (!result?.content) {
       throw new Error("Upstream returned an invalid MCP tool result.");
     }
-    return payload.result;
+    return result;
   }
 }
 
 export class ExecutorRouter {
-  constructor(private readonly executors: UpstreamExecutor[]) {}
+  readonly #active = new Map<string, number>();
+  readonly #failures = new Map<string, { count: number; openUntil: number }>();
+
+  constructor(
+    private readonly executors: UpstreamExecutor[],
+    private readonly limits: {
+      maxConcurrencyPerServer?: number;
+      failureThreshold?: number;
+      circuitOpenMs?: number;
+    } = {}
+  ) {}
 
   async execute(
     resolved: ResolvedTool,
@@ -329,7 +442,63 @@ export class ExecutorRouter {
         `No ${resolved.server.transport} execution adapter is installed.`
       );
     }
-    return executor.execute(resolved.server, resolved.upstreamName, args, context);
+    const authorityKey = `${context.tenantId}:${resolved.server.id}`;
+    const circuit = this.#failures.get(authorityKey);
+    if (circuit && circuit.openUntil > Date.now()) {
+      throw new Error(
+        "The upstream circuit is temporarily open after repeated failures."
+      );
+    }
+    const active = this.#active.get(authorityKey) ?? 0;
+    if (active >= (this.limits.maxConcurrencyPerServer ?? 20)) {
+      throw new Error("The upstream concurrency limit is currently saturated.");
+    }
+    this.#active.set(authorityKey, active + 1);
+    const attempts = resolved.tool.idempotent ? 2 : 1;
+    try {
+      for (let attempt = 1; attempt <= attempts; attempt += 1) {
+        try {
+          const result = await executor.execute(
+            resolved.server,
+            resolved.upstreamName,
+            args,
+            context
+          );
+          this.#failures.delete(authorityKey);
+          return result;
+        } catch (error) {
+          if (attempt < attempts && !context.signal?.aborted) {
+            await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
+            continue;
+          }
+          const previous = this.#failures.get(authorityKey)?.count ?? 0;
+          const count = previous + 1;
+          this.#failures.set(authorityKey, {
+            count,
+            openUntil:
+              count >= (this.limits.failureThreshold ?? 3)
+                ? Date.now() + (this.limits.circuitOpenMs ?? 30_000)
+                : 0,
+          });
+          throw error;
+        }
+      }
+      throw new Error("Upstream execution exhausted its retry budget.");
+    } finally {
+      const remaining = (this.#active.get(authorityKey) ?? 1) - 1;
+      if (remaining <= 0) this.#active.delete(authorityKey);
+      else this.#active.set(authorityKey, remaining);
+    }
+  }
+
+  async probe(server: McpServerDefinition, context: ProbeContext) {
+    const executor = this.executors.find(
+      (candidate) => candidate.supports(server) && candidate.probe
+    );
+    if (!executor?.probe) {
+      throw new Error(`No ${server.transport} probe adapter is installed.`);
+    }
+    return executor.probe(server, context);
   }
 }
 
@@ -373,9 +542,84 @@ const callParams = (params: unknown) => {
   };
 };
 
+const jsonBytes = (value: unknown) => {
+  try {
+    return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  } catch {
+    return 0;
+  }
+};
+
+const parseInitializeClientInfo = (params: unknown): SessionClientInfo | null => {
+  if (!params || typeof params !== "object" || Array.isArray(params)) return null;
+  const value = params as {
+    protocolVersion?: unknown;
+    clientInfo?: { name?: unknown; version?: unknown };
+  };
+  const protocolVersion =
+    typeof value.protocolVersion === "string" ? value.protocolVersion.trim() : "";
+  const name =
+    typeof value.clientInfo?.name === "string" ? value.clientInfo.name.trim() : "";
+  const version =
+    typeof value.clientInfo?.version === "string"
+      ? value.clientInfo.version.trim()
+      : "";
+  if (
+    protocolVersion.length < 1 ||
+    protocolVersion.length > 64 ||
+    name.length < 1 ||
+    name.length > 120 ||
+    version.length < 1 ||
+    version.length > 64
+  ) {
+    return null;
+  }
+  const normalized = name.toLowerCase();
+  const sdk = normalized === "@litemcp/sdk" || normalized === "litemcp-sdk-python";
+  const userAgentClass: SessionClientInfo["userAgentClass"] = sdk
+    ? "litemcp-sdk"
+    : normalized.includes("cursor")
+      ? "cursor"
+      : normalized.includes("claude")
+        ? "claude-code"
+        : normalized.includes("chatgpt")
+          ? "chatgpt"
+          : normalized.includes("browser")
+            ? "browser"
+            : "other";
+  return {
+    name,
+    version,
+    protocolVersion,
+    initializedAt: new Date().toISOString(),
+    userAgentClass,
+    sdk,
+  };
+};
+
+type TerminalCallUsage = {
+  eventType: "call" | "denied" | "approval_required" | "error";
+  status: "succeeded" | "denied" | "pending" | "failed";
+  errorCode?: string;
+  namespace?: string;
+  serverId?: string;
+  tool?: string;
+  aliasUsed?: boolean;
+  risk?: ResolvedTool["tool"]["risk"];
+  decisionEffect?: ResolvedTool["decision"]["effect"];
+  matchedRuleIds?: string[];
+  policyId?: string;
+  policyVersion?: string;
+  approvalId?: string;
+  auditReceipt?: AuditReceipt;
+};
+
 export type McpGatewayOptions = {
   platform: PlatformService;
   executors?: UpstreamExecutor[];
+  maxConcurrencyPerServer?: number;
+  circuitFailureThreshold?: number;
+  circuitOpenMs?: number;
 };
 
 export class McpGateway {
@@ -383,8 +627,21 @@ export class McpGateway {
 
   constructor(private readonly options: McpGatewayOptions) {
     this.#router = new ExecutorRouter(
-      options.executors ?? [new BuiltinExecutor(), new RemoteHttpExecutor()]
+      options.executors ?? [new BuiltinExecutor(), new RemoteHttpExecutor()],
+      {
+        maxConcurrencyPerServer: options.maxConcurrencyPerServer,
+        failureThreshold: options.circuitFailureThreshold,
+        circuitOpenMs: options.circuitOpenMs,
+      }
     );
+  }
+
+  async probeServer(
+    server: McpServerDefinition,
+    requestId: string,
+    signal?: AbortSignal
+  ) {
+    return this.#router.probe(server, { requestId, signal });
   }
 
   async handle(params: {
@@ -395,30 +652,12 @@ export class McpGateway {
     requestId: string;
     signal?: AbortSignal;
   }): Promise<{ status: number; body?: JsonRpcResponse }> {
+    const handleStartedAt = performance.now();
+    const requestBytes = jsonBytes(params.body);
     const request = params.body as Partial<JsonRpcRequest>;
     const id = request.id ?? null;
     if (request.jsonrpc !== "2.0" || typeof request.method !== "string") {
       return { status: 400, body: errorResponse(id, -32600, "Invalid Request") };
-    }
-
-    if (request.method === "initialize") {
-      return {
-        status: 200,
-        body: resultResponse(id, {
-          protocolVersion: MCP_PROTOCOL_VERSION,
-          capabilities: {
-            tools: { listChanged: true },
-            logging: {},
-          },
-          serverInfo: { name: "LiteMCP Composer", version: "0.1.0" },
-          instructions:
-            "Capabilities are filtered by session identity and re-authorized on execution.",
-        }),
-      };
-    }
-
-    if (request.method.startsWith("notifications/")) {
-      return { status: 202 };
     }
 
     const token = parseBearer(params.authorization);
@@ -449,28 +688,98 @@ export class McpGateway {
       };
     }
 
+    if (request.method === "initialize") {
+      const observedClientInfo = parseInitializeClientInfo(request.params);
+      if (!observedClientInfo) {
+        const response = errorResponse(
+          id,
+          -32602,
+          "Invalid initialize parameters. clientInfo name/version and protocolVersion are required."
+        );
+        this.options.platform.recordSessionUsage(session, {
+          eventType: "error",
+          status: "failed",
+          requestId: params.requestId,
+          errorCode: "INVALID_INITIALIZE_PARAMS",
+          latencyTotalMs: Math.max(0, performance.now() - handleStartedAt),
+          requestBytes,
+          responseBytes: jsonBytes(response),
+        });
+        return { status: 400, body: response };
+      }
+      let clientInfo = observedClientInfo;
+      try {
+        clientInfo = await this.options.platform.bindSessionAttribution(
+          params.tenantId,
+          session.id,
+          observedClientInfo
+        );
+      } catch (error) {
+        // Attribution persistence belongs to the fail-open insight plane.
+        console.error("[litemcp] session attribution persistence failed", {
+          requestId: params.requestId,
+          errorClass: error instanceof Error ? error.name : "UnknownError",
+        });
+      }
+      const response = resultResponse(id, {
+        protocolVersion: MCP_PROTOCOL_VERSION,
+        capabilities: {
+          tools: { listChanged: true },
+          logging: {},
+        },
+        serverInfo: { name: "LiteMCP Composer", version: "0.1.0" },
+        instructions:
+          "Capabilities are filtered by session identity and re-authorized on execution.",
+      });
+      this.options.platform.recordSessionUsage(session, {
+        eventType: "initialize",
+        status: "succeeded",
+        requestId: params.requestId,
+        clientInfo,
+        latencyTotalMs: Math.max(0, performance.now() - handleStartedAt),
+        requestBytes,
+        responseBytes: jsonBytes(response),
+      });
+      return {
+        status: 200,
+        body: response,
+      };
+    }
+
+    if (request.method.startsWith("notifications/")) {
+      return { status: 202 };
+    }
+
     if (request.method === "ping") {
       return { status: 200, body: resultResponse(id, {}) };
     }
 
+    if (request.method === "logging/setLevel") {
+      return { status: 200, body: resultResponse(id, {}) };
+    }
+
     if (request.method === "tools/list") {
-      const tools = await this.options.platform.listVisibleTools(
-        params.tenantId,
-        composition.id,
-        session.subject,
-        params.requestId
-      );
-      return {
-        status: 200,
-        body: resultResponse(id, {
-          tools: tools.map((tool) => ({
+      try {
+        const discovery = await this.options.platform.discoverVisibleTools(
+          params.tenantId,
+          composition.id,
+          session.subject,
+          params.requestId
+        );
+        const response = resultResponse(id, {
+          tools: discovery.tools.map((tool) => ({
             name: tool.name,
             title: tool.title,
             description: tool.description,
             inputSchema: tool.inputSchema,
             annotations: {
               readOnlyHint: tool.readOnly,
-              destructiveHint: tool.risk === "destructive",
+              destructiveHint: [
+                "destructive",
+                "financial",
+                "code-exec",
+                "identity-admin",
+              ].includes(tool.risk),
               idempotentHint: tool.idempotent,
             },
             _meta: {
@@ -479,32 +788,122 @@ export class McpGateway {
               "litemcp.dev/serverVersion": tool.serverVersion,
             },
           })),
-        }),
-      };
+        });
+        this.options.platform.recordSessionUsage(session, {
+          eventType: "discover",
+          status: discovery.denied ? "denied" : "succeeded",
+          requestId: params.requestId,
+          matchedRuleIds: discovery.matchedRuleIds,
+          ...(discovery.policyId ? { policyId: discovery.policyId } : {}),
+          ...(discovery.policyVersion
+            ? { policyVersion: discovery.policyVersion }
+            : {}),
+          toolsVisible: discovery.toolsVisible,
+          toolsHidden: discovery.toolsHidden,
+          visibleTools: discovery.visibleTools,
+          visibilityTruncated: discovery.visibilityTruncated,
+          auditReceipt: discovery.auditReceipt,
+          latencyTotalMs: Math.max(0, performance.now() - handleStartedAt),
+          requestBytes,
+          responseBytes: jsonBytes(response),
+        });
+        return { status: 200, body: response };
+      } catch (error) {
+        const response = errorResponse(id, -32002, "Capability discovery failed.", {
+          requestId: params.requestId,
+        });
+        this.options.platform.recordSessionUsage(session, {
+          eventType: "discover",
+          status: "failed",
+          requestId: params.requestId,
+          matchedRuleIds: [],
+          toolsVisible: 0,
+          toolsHidden: 0,
+          visibleTools: [],
+          visibilityTruncated: false,
+          errorCode:
+            error instanceof PlatformAuthorizationError
+              ? "DISCOVERY_DENIED"
+              : "DISCOVERY_FAILED",
+          latencyTotalMs: Math.max(0, performance.now() - handleStartedAt),
+          requestBytes,
+          responseBytes: jsonBytes(response),
+        });
+        return { status: 502, body: response };
+      }
     }
 
     if (request.method === "tools/call") {
       const parsed = callParams(request.params);
       if (!parsed) {
-        return {
-          status: 400,
-          body: errorResponse(id, -32602, "Invalid tools/call parameters."),
-        };
+        const response = errorResponse(id, -32602, "Invalid tools/call parameters.");
+        this.options.platform.recordSessionUsage(session, {
+          eventType: "error",
+          status: "failed",
+          requestId: params.requestId,
+          errorCode: "INVALID_CALL_PARAMS",
+          latencyTotalMs: Math.max(0, performance.now() - handleStartedAt),
+          latencyUpstreamMs: 0,
+          requestBytes,
+          responseBytes: jsonBytes(response),
+        });
+        return { status: 400, body: response };
       }
+
+      let resolved: ResolvedTool | undefined;
+      let usageSession: GatewaySession = session;
+      let terminalUsage: TerminalCallUsage | null = {
+        eventType: "error",
+        status: "failed",
+        errorCode: "INTERNAL_ERROR",
+        tool: parsed.name,
+      };
+      let responseBody: JsonRpcResponse | undefined;
+      let latencyUpstreamMs = 0;
+      let upstreamRequestBytes = 0;
+      let upstreamResponseBytes = 0;
+      const finish = (status: number, body: JsonRpcResponse) => {
+        responseBody = body;
+        return { status, body };
+      };
+      const usageForResolved = (
+        current: ResolvedTool,
+        eventType: TerminalCallUsage["eventType"],
+        status: TerminalCallUsage["status"],
+        errorCode?: string,
+        auditReceipt: AuditReceipt = current.auditReceipt
+      ): TerminalCallUsage => ({
+        eventType,
+        status,
+        ...(errorCode ? { errorCode } : {}),
+        namespace: current.canonicalName.slice(0, current.canonicalName.indexOf(".")),
+        serverId: current.server.id,
+        tool: current.canonicalName,
+        aliasUsed: current.aliasUsed,
+        risk: current.tool.risk,
+        decisionEffect: current.decision.effect,
+        matchedRuleIds: current.decision.matchedRuleIds,
+        ...(current.decision.policyId ? { policyId: current.decision.policyId } : {}),
+        ...(current.decision.policyVersion
+          ? { policyVersion: current.decision.policyVersion }
+          : {}),
+        auditReceipt,
+      });
       try {
-        const resolved = await this.options.platform.resolveTool(
+        resolved = await this.options.platform.resolveTool(
           params.tenantId,
           composition.id,
           session.subject,
           parsed.name,
           params.requestId
         );
+        terminalUsage = usageForResolved(resolved, "error", "failed", "INTERNAL_ERROR");
         const argumentErrors = validateToolArguments(
           resolved.tool.inputSchema,
           parsed.arguments
         );
         if (argumentErrors.length > 0) {
-          await this.options.platform.appendAudit(params.tenantId, {
+          const auditEvent = await this.options.platform.appendAudit(params.tenantId, {
             type: "execution.validation-denied",
             actorId: session.subject.id,
             action: "execute",
@@ -516,101 +915,192 @@ export class McpGateway {
             explanation: "Tool arguments did not satisfy the advertised input schema.",
             metadata: { validationErrors: argumentErrors },
           });
-          return {
-            status: 400,
-            body: errorResponse(id, -32602, "Invalid tool arguments.", {
+          terminalUsage = usageForResolved(
+            resolved,
+            "denied",
+            "denied",
+            "ARGUMENT_VALIDATION",
+            auditEvent
+          );
+          return finish(
+            400,
+            errorResponse(id, -32602, "Invalid tool arguments.", {
               errors: argumentErrors,
               requestId: params.requestId,
-            }),
-          };
+            })
+          );
         }
         if (resolved.decision.requiresApproval) {
-          const approval = await this.options.platform.createApproval(
+          const approvalState = await this.options.platform.consumeApprovalForCall(
             params.tenantId,
             session,
             resolved,
             parsed.arguments,
             params.requestId
           );
-          return {
-            status: 200,
-            body: resultResponse(id, {
-              content: [
-                {
-                  type: "text",
-                  text: `Approval ${approval.id} is required before execution.`,
+          if (approvalState.state === "denied") {
+            terminalUsage = {
+              ...usageForResolved(resolved, "denied", "denied", "APPROVAL_DENIED"),
+              approvalId: approvalState.approval.id,
+            };
+            return finish(
+              403,
+              errorResponse(id, -32003, "This exact action was denied.", {
+                approvalId: approvalState.approval.id,
+                reason: approvalState.approval.decisionReason,
+              })
+            );
+          }
+          if (approvalState.state !== "approved") {
+            let approval: ApprovalRequest;
+            let lifecycleRecorded = false;
+            if (approvalState.state === "pending") {
+              approval = approvalState.approval;
+            } else {
+              const created = await this.options.platform.createApprovalWithState(
+                params.tenantId,
+                session,
+                resolved,
+                parsed.arguments,
+                params.requestId
+              );
+              approval = created.approval;
+              lifecycleRecorded = created.created;
+            }
+            terminalUsage = lifecycleRecorded
+              ? null
+              : {
+                  ...usageForResolved(resolved, "approval_required", "pending"),
+                  approvalId: approval.id,
+                };
+            return finish(
+              200,
+              resultResponse(id, {
+                content: [
+                  {
+                    type: "text",
+                    text: `Approval ${approval.id} is required before execution.`,
+                  },
+                ],
+                structuredContent: {
+                  status: "approval_required",
+                  approvalId: approval.id,
+                  argumentsHash: approval.argumentsHash,
+                  expiresAt: approval.expiresAt,
                 },
-              ],
-              structuredContent: {
-                status: "approval_required",
-                approvalId: approval.id,
-                argumentsHash: approval.argumentsHash,
-                expiresAt: approval.expiresAt,
-              },
-              isError: false,
-            }),
-          };
+                isError: true,
+              })
+            );
+          }
         }
+        await this.options.platform.consumeToolCallQuota(params.tenantId);
         const executionId = randomId("execution");
         try {
-          await this.options.platform.appendAudit(params.tenantId, {
-            type: "execution.dispatched",
-            actorId: session.subject.id,
-            action: "execute",
-            targetType: "tool",
-            targetId: resolved.canonicalName,
-            outcome: "allowed",
-            requestId: params.requestId,
-            policyVersion: resolved.decision.policyVersion ?? undefined,
-            explanation: "Execution was authorized and is ready for upstream dispatch.",
-            metadata: {
-              executionId,
-              idempotent: resolved.tool.idempotent,
-              serverId: resolved.server.id,
-            },
-          });
+          const dispatchAudit = await this.options.platform.appendAudit(
+            params.tenantId,
+            {
+              type: "execution.dispatched",
+              actorId: session.subject.id,
+              action: "execute",
+              targetType: "tool",
+              targetId: resolved.canonicalName,
+              outcome: "allowed",
+              requestId: params.requestId,
+              policyVersion: resolved.decision.policyVersion ?? undefined,
+              explanation:
+                "Execution was authorized and is ready for upstream dispatch.",
+              metadata: {
+                executionId,
+                idempotent: resolved.tool.idempotent,
+                serverId: resolved.server.id,
+              },
+            }
+          );
+          terminalUsage = usageForResolved(
+            resolved,
+            "error",
+            "failed",
+            "INTERNAL_ERROR",
+            dispatchAudit
+          );
         } catch (error) {
           console.error("[litemcp] execution blocked because audit is unavailable", {
             requestId: params.requestId,
             executionId,
             errorClass: error instanceof Error ? error.name : "UnknownError",
           });
-          return {
-            status: 503,
-            body: errorResponse(
+          terminalUsage = usageForResolved(
+            resolved,
+            "error",
+            "failed",
+            "AUDIT_UNAVAILABLE"
+          );
+          return finish(
+            503,
+            errorResponse(
               id,
               -32004,
               "Execution was not dispatched because audit persistence is unavailable.",
               { retryable: true, requestId: params.requestId }
-            ),
-          };
+            )
+          );
         }
-        const startedAt = performance.now();
+        const dispatchSession = await this.options.platform.authenticateSession(
+          params.tenantId,
+          token
+        );
+        if (!dispatchSession || dispatchSession.id !== session.id) {
+          throw new PlatformAuthorizationError(
+            "The MCP session was revoked or frozen before dispatch."
+          );
+        }
+        usageSession = dispatchSession;
+        await this.options.platform.assertExecutionContext(
+          params.tenantId,
+          dispatchSession,
+          resolved
+        );
+        const dispatchStartedAt = performance.now();
         const result = await this.#router.execute(resolved, parsed.arguments, {
           requestId: params.requestId,
           tenantId: params.tenantId,
-          session,
+          session: dispatchSession,
           signal: params.signal,
+          onUpstreamMeasurement: (measurement) => {
+            latencyUpstreamMs += measurement.latencyMs;
+            upstreamRequestBytes += measurement.requestBytes;
+            upstreamResponseBytes += measurement.responseBytes;
+          },
         });
         try {
-          await this.options.platform.appendAudit(params.tenantId, {
-            type: "execution.completed",
-            actorId: session.subject.id,
-            action: "execute",
-            targetType: "tool",
-            targetId: resolved.canonicalName,
-            outcome: result.isError ? "failed" : "succeeded",
-            requestId: params.requestId,
-            policyVersion: resolved.decision.policyVersion ?? undefined,
-            explanation: `Routed to ${resolved.server.name} ${resolved.server.version}.`,
-            metadata: {
-              executionId,
-              transport: resolved.server.transport,
-              serverId: resolved.server.id,
-              upstreamTool: resolved.upstreamName,
-              durationMs: Math.round(performance.now() - startedAt),
-            },
-          });
+          const completionAudit = await this.options.platform.appendAudit(
+            params.tenantId,
+            {
+              type: "execution.completed",
+              actorId: session.subject.id,
+              action: "execute",
+              targetType: "tool",
+              targetId: resolved.canonicalName,
+              outcome: result.isError ? "failed" : "succeeded",
+              requestId: params.requestId,
+              policyVersion: resolved.decision.policyVersion ?? undefined,
+              explanation: `Routed to ${resolved.server.name} ${resolved.server.version}.`,
+              metadata: {
+                executionId,
+                transport: resolved.server.transport,
+                serverId: resolved.server.id,
+                upstreamTool: resolved.upstreamName,
+                durationMs: Math.round(performance.now() - dispatchStartedAt),
+              },
+            }
+          );
+          terminalUsage = usageForResolved(
+            resolved,
+            result.isError ? "error" : "call",
+            result.isError ? "failed" : "succeeded",
+            result.isError ? "TOOL_REPORTED_ERROR" : undefined,
+            completionAudit
+          );
         } catch (error) {
           // The upstream already completed. Never convert a successful side
           // effect into a retryable failure because completion-audit storage
@@ -620,47 +1110,173 @@ export class McpGateway {
             executionId,
             errorClass: error instanceof Error ? error.name : "UnknownError",
           });
+          terminalUsage = usageForResolved(
+            resolved,
+            result.isError ? "error" : "call",
+            result.isError ? "failed" : "succeeded",
+            result.isError ? "TOOL_REPORTED_ERROR" : undefined,
+            terminalUsage?.auditReceipt ?? resolved.auditReceipt
+          );
         }
-        return { status: 200, body: resultResponse(id, result) };
+        if (!result.isError) {
+          // Activation is best-effort product telemetry and is meaningful only
+          // after the tool has returned a successful result.
+          await this.options.platform
+            .recordActivationEvent(
+              params.tenantId,
+              "first_tool_call",
+              session.subject.id,
+              { toolName: resolved.canonicalName },
+              true
+            )
+            .catch(() => null);
+        }
+        return finish(200, resultResponse(id, result));
       } catch (error) {
-        if (error instanceof PlatformAuthorizationError) {
-          return {
-            status: 403,
-            body: errorResponse(id, -32003, "Tool execution denied by policy.", {
+        if (error instanceof PlatformPolicyDeniedError) {
+          const denied = error.context;
+          terminalUsage = {
+            eventType: "denied",
+            status: "denied",
+            errorCode: "POLICY_DENIED",
+            namespace: denied.namespace,
+            serverId: denied.serverId,
+            tool: denied.canonicalName,
+            aliasUsed: denied.aliasUsed,
+            risk: denied.risk,
+            decisionEffect: denied.decision.effect,
+            matchedRuleIds: denied.decision.matchedRuleIds,
+            ...(denied.decision.policyId ? { policyId: denied.decision.policyId } : {}),
+            ...(denied.decision.policyVersion
+              ? { policyVersion: denied.decision.policyVersion }
+              : {}),
+            auditReceipt: denied.auditReceipt,
+          };
+          return finish(
+            403,
+            errorResponse(id, -32003, "Tool execution denied by policy.", {
               explanation: error.message,
               requestId: params.requestId,
-            }),
-          };
+            })
+          );
+        }
+        if (error instanceof PlatformAuthorizationError) {
+          terminalUsage = resolved
+            ? usageForResolved(resolved, "denied", "denied", "AUTHORIZATION_DENIED")
+            : {
+                eventType: "denied",
+                status: "denied",
+                errorCode: "AUTHORIZATION_DENIED",
+                tool: parsed.name,
+              };
+          return finish(
+            403,
+            errorResponse(id, -32003, "Tool execution denied by policy.", {
+              explanation: error.message,
+              requestId: params.requestId,
+            })
+          );
         }
         if (error instanceof PlatformNotFoundError) {
-          return {
-            status: 404,
-            body: errorResponse(id, -32601, "Tool not found or not visible."),
+          terminalUsage = {
+            eventType: "denied",
+            status: "denied",
+            errorCode: "TOOL_NOT_VISIBLE",
+            tool: parsed.name,
           };
+          return finish(
+            404,
+            errorResponse(id, -32601, "Tool not found or not visible.")
+          );
+        }
+        if (error instanceof PlatformQuotaError) {
+          terminalUsage = resolved
+            ? usageForResolved(resolved, "denied", "denied", "QUOTA_EXCEEDED")
+            : {
+                eventType: "denied",
+                status: "denied",
+                errorCode: "QUOTA_EXCEEDED",
+                tool: parsed.name,
+              };
+          return finish(
+            429,
+            errorResponse(id, -32005, error.message, {
+              retryable: false,
+              requestId: params.requestId,
+            })
+          );
+        }
+        if (error instanceof PlatformConflictError) {
+          terminalUsage = resolved
+            ? usageForResolved(
+                resolved,
+                "error",
+                "failed",
+                "EXECUTION_CONTEXT_CONFLICT"
+              )
+            : {
+                eventType: "error",
+                status: "failed",
+                errorCode: "EXECUTION_CONTEXT_CONFLICT",
+                tool: parsed.name,
+              };
+          return finish(
+            409,
+            errorResponse(id, -32009, error.message, {
+              retryable: false,
+              requestId: params.requestId,
+            })
+          );
         }
         try {
-          await this.options.platform.appendAudit(params.tenantId, {
-            type: "execution.failed",
-            actorId: session.subject.id,
-            action: "execute",
-            targetType: "tool",
-            targetId: parsed.name,
-            outcome: "failed",
-            requestId: params.requestId,
-            explanation: "The upstream execution failed or its outcome is unknown.",
-            metadata: {
-              errorClass: error instanceof Error ? error.name : "UnknownError",
-            },
-          });
+          const failureAudit = await this.options.platform.appendAudit(
+            params.tenantId,
+            {
+              type: "execution.failed",
+              actorId: session.subject.id,
+              action: "execute",
+              targetType: "tool",
+              targetId: parsed.name,
+              outcome: "failed",
+              requestId: params.requestId,
+              explanation: "The upstream execution failed or its outcome is unknown.",
+              metadata: {
+                errorClass: error instanceof Error ? error.name : "UnknownError",
+              },
+            }
+          );
+          terminalUsage = resolved
+            ? usageForResolved(
+                resolved,
+                "error",
+                "failed",
+                "UPSTREAM_FAILURE",
+                failureAudit
+              )
+            : {
+                eventType: "error",
+                status: "failed",
+                errorCode: "UPSTREAM_FAILURE",
+                tool: parsed.name,
+                auditReceipt: failureAudit,
+              };
         } catch (auditError) {
           console.error("[litemcp] failure audit persistence failed", {
             requestId: params.requestId,
             errorClass: auditError instanceof Error ? auditError.name : "UnknownError",
           });
+          terminalUsage = resolved
+            ? usageForResolved(resolved, "error", "failed", "UPSTREAM_FAILURE")
+            : {
+                eventType: "error",
+                status: "failed",
+                errorCode: "UPSTREAM_FAILURE",
+                tool: parsed.name,
+              };
         }
-        return {
-          status: 502,
-          body: errorResponse(
+        return finish(
+          502,
+          errorResponse(
             id,
             -32002,
             "Upstream execution failed or has an indeterminate outcome; do not retry automatically.",
@@ -669,8 +1285,26 @@ export class McpGateway {
               outcome: "indeterminate",
               requestId: params.requestId,
             }
-          ),
-        };
+          )
+        );
+      } finally {
+        if (terminalUsage) {
+          const latencyTotalMs = Math.max(0, performance.now() - handleStartedAt);
+          this.options.platform.recordSessionUsage(usageSession, {
+            ...terminalUsage,
+            requestId: params.requestId,
+            latencyTotalMs,
+            latencyUpstreamMs: Math.min(latencyUpstreamMs, latencyTotalMs),
+            requestBytes:
+              upstreamRequestBytes > 0 ? upstreamRequestBytes : requestBytes,
+            responseBytes:
+              upstreamResponseBytes > 0
+                ? upstreamResponseBytes
+                : responseBody
+                  ? jsonBytes(responseBody)
+                  : 0,
+          });
+        }
       }
     }
 

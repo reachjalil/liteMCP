@@ -1,16 +1,19 @@
-name: Deploy managed cloud
+name: Deploy customer-owned Cloudflare reference
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows:
-      - CI
-    branches:
-      - main
-    types:
-      - completed
+    inputs:
+      candidate_sha:
+        description: Full SHA accepted by managed-cloud staging
+        required: true
+        type: string
+      staging_run_id:
+        description: Successful staging workflow run that accepted this SHA
+        required: true
+        type: string
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -18,43 +21,130 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: 24.11.1
   PNPM_VERSION: 10.30.2
 
 jobs:
-  deploy:
-    name: Deploy and baseline-smoke managed cloud
-    if: >-
-      (github.event_name == 'workflow_dispatch' || vars.MANAGED_CLOUD_AUTO_DEPLOY == 'true') &&
-      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    environment:
-      name: managed-cloud
-      url: ${{ vars.MANAGED_CLOUD_URL }}
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      MANAGED_CLOUD_URL: ${{ vars.MANAGED_CLOUD_URL }}
-      MANAGED_CLOUD_RESOURCES_READY: ${{ vars.MANAGED_CLOUD_RESOURCES_READY }}
+  preflight:
+    name: Enforce production deployment opt-in
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
-      - name: Check required deployment configuration
+      - name: Refuse a disabled or non-main manual deployment
+        env:
+          DEPLOY_ENABLED: ${{ vars.CUSTOMER_OWNED_REFERENCE_DEPLOY }}
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$CLOUDFLARE_API_TOKEN"
-          test -n "$CLOUDFLARE_ACCOUNT_ID"
-          test -n "$MANAGED_CLOUD_URL"
-          test "$MANAGED_CLOUD_RESOURCES_READY" = "true"
-          case "$MANAGED_CLOUD_URL" in
-            https://*) ;;
-            *) printf 'MANAGED_CLOUD_URL must be an HTTPS origin.\n' >&2; exit 1 ;;
-          esac
-      - name: Check out the validated revision
+          test "$DEPLOY_ENABLED" = "true"
+          test "$GITHUB_REF" = "refs/heads/main"
+
+  qualify:
+    name: Verify immutable staging evidence
+    needs:
+      - preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      ci_run_attempt: ${{ steps.evidence.outputs.ci_run_attempt }}
+      ci_run_id: ${{ steps.evidence.outputs.ci_run_id }}
+      staging_artifact_sha256: ${{ steps.evidence.outputs.staging_artifact_sha256 }}
+      staging_run_attempt: ${{ steps.evidence.outputs.staging_run_attempt }}
+      staging_worker_version_id: ${{ steps.evidence.outputs.staging_worker_version_id }}
+    steps:
+      - name: Check out trusted promotion controls
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-      - name: Verify the checked-in origin matches the deployment
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Download and verify exact-candidate staging evidence
+        id: evidence
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STAGING_RUN_ID: ${{ inputs.staging_run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$STAGING_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$STAGING_RUN_ID" \
+            >"$RUNNER_TEMP/staging-run.json"
+          staging_run_attempt="$(node -e \
+            'const run=require(process.argv[1]); process.stdout.write(String(run.run_attempt))' \
+            "$RUNNER_TEMP/staging-run.json")"
+          [[ "$staging_run_attempt" =~ ^[1-9][0-9]*$ ]]
+          mkdir -p "$RUNNER_TEMP/staging-evidence"
+          gh run download "$STAGING_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "managed-cloud-staging-evidence-$CANDIDATE_SHA-run-$STAGING_RUN_ID-attempt-$staging_run_attempt" \
+            --dir "$RUNNER_TEMP/staging-evidence"
+          node scripts/verify-workflow-evidence.mjs staging \
+            "$RUNNER_TEMP/staging-run.json" \
+            "$RUNNER_TEMP/staging-evidence/managed-cloud-staging-evidence.json" \
+            "$CANDIDATE_SHA" \
+            "$STAGING_RUN_ID" \
+            "$GITHUB_REPOSITORY"
+          ci_run_id="$(node -e \
+            'const evidence=require(process.argv[1]); process.stdout.write(String(evidence.ci_run_id))' \
+            "$RUNNER_TEMP/staging-evidence/managed-cloud-staging-evidence.json")"
+          ci_run_attempt="$(node -e \
+            'const evidence=require(process.argv[1]); process.stdout.write(String(evidence.ci_run_attempt))' \
+            "$RUNNER_TEMP/staging-evidence/managed-cloud-staging-evidence.json")"
+          [[ "$ci_run_id" =~ ^[1-9][0-9]*$ ]]
+          [[ "$ci_run_attempt" =~ ^[1-9][0-9]*$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ci_run_id" \
+            >"$RUNNER_TEMP/ci-run.json"
+          node scripts/verify-workflow-evidence.mjs ci \
+            "$RUNNER_TEMP/ci-run.json" \
+            "$CANDIDATE_SHA" \
+            "$ci_run_id" \
+            "$GITHUB_REPOSITORY" \
+            "$ci_run_attempt"
+          staging_artifact_sha256="$(node -e \
+            'const evidence=require(process.argv[1]); process.stdout.write(String(evidence.artifact_sha256))' \
+            "$RUNNER_TEMP/staging-evidence/managed-cloud-staging-evidence.json")"
+          staging_worker_version_id="$(node -e \
+            'const evidence=require(process.argv[1]); process.stdout.write(String(evidence.worker_version_id))' \
+            "$RUNNER_TEMP/staging-evidence/managed-cloud-staging-evidence.json")"
+          printf 'ci_run_id=%s\n' "$ci_run_id" >>"$GITHUB_OUTPUT"
+          printf 'ci_run_attempt=%s\n' "$ci_run_attempt" >>"$GITHUB_OUTPUT"
+          printf 'staging_run_attempt=%s\n' "$staging_run_attempt" >>"$GITHUB_OUTPUT"
+          printf 'staging_artifact_sha256=%s\n' "$staging_artifact_sha256" >>"$GITHUB_OUTPUT"
+          printf 'staging_worker_version_id=%s\n' "$staging_worker_version_id" >>"$GITHUB_OUTPUT"
+      - name: Check out the accepted candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          persist-credentials: false
+      - name: Verify checked-out candidate
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        run: test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+      - name: Verify production/staging configuration isolation
+        run: node scripts/check-managed-cloud-wrangler.mjs --require-staging-resource-ids
+
+  deploy:
+    name: Deploy and smoke customer-owned reference production
+    needs:
+      - qualify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: managed-cloud
+      url: ${{ vars.MANAGED_CLOUD_URL }}
+    steps:
+      - name: Check out the accepted candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          persist-credentials: false
+      - name: Verify checked-out candidate
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        run: test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+      - name: Verify the checked-in origin matches production
+        env:
+          MANAGED_CLOUD_URL: ${{ vars.MANAGED_CLOUD_URL }}
         run: |
           node --input-type=module - <<'NODE'
           import { readFileSync } from "node:fs";
@@ -81,18 +171,223 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Verify Wrangler identity
+      - name: Check required production configuration
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_DEPLOY_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_MIGRATION_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_API_TOKEN }}
+          MANAGED_CLOUD_URL: ${{ vars.MANAGED_CLOUD_URL }}
+          MANAGED_CLOUD_RESOURCES_READY: ${{ vars.MANAGED_CLOUD_RESOURCES_READY }}
+          MANAGED_CLOUD_MCP_ENDPOINT: ${{ vars.MANAGED_CLOUD_MCP_ENDPOINT }}
+          MANAGED_CLOUD_MCP_TOKEN: ${{ secrets.MANAGED_CLOUD_MCP_TOKEN }}
+          MANAGED_CLOUD_MCP_TOOL_NAME: ${{ vars.MANAGED_CLOUD_MCP_TOOL_NAME }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_DEPLOY_API_TOKEN"
+          test -n "$CLOUDFLARE_MIGRATION_API_TOKEN"
+          test "$CLOUDFLARE_DEPLOY_API_TOKEN" != "$CLOUDFLARE_MIGRATION_API_TOKEN"
+          test -n "$MANAGED_CLOUD_URL"
+          test "$MANAGED_CLOUD_RESOURCES_READY" = "true"
+          test -n "$MANAGED_CLOUD_MCP_ENDPOINT"
+          test -n "$MANAGED_CLOUD_MCP_TOKEN"
+          test -n "$MANAGED_CLOUD_MCP_TOOL_NAME"
+          case "$MANAGED_CLOUD_URL" in
+            https://*) ;;
+            *) printf 'MANAGED_CLOUD_URL must be an HTTPS origin.\n' >&2; exit 1 ;;
+          esac
+      - name: Download and verify the exact CI-built production archive
+        id: artifact
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          CI_RUN_ATTEMPT: ${{ needs.qualify.outputs.ci_run_attempt }}
+          CI_RUN_ID: ${{ needs.qualify.outputs.ci_run_id }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_name="managed-cloud-artifact-production-$CANDIDATE_SHA-run-$CI_RUN_ID-attempt-$CI_RUN_ATTEMPT"
+          artifact_dir="$RUNNER_TEMP/managed-cloud-production-artifact"
+          payload_dir="$RUNNER_TEMP/managed-cloud-production-payload"
+          mkdir -p "$artifact_dir" "$payload_dir"
+          gh run download "$CI_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$artifact_name" \
+            --dir "$artifact_dir"
+          archive="$artifact_dir/managed-cloud-production.tar.gz"
+          metadata="$artifact_dir/managed-cloud-production.json"
+          archive_sha256="$(node scripts/verify-managed-cloud-artifact.mjs verify \
+            "$metadata" "$archive" "$GITHUB_REPOSITORY" "$CANDIDATE_SHA" \
+            "$CI_RUN_ID" "$CI_RUN_ATTEMPT" production)"
+          while IFS= read -r entry; do
+            case "$entry" in
+              assets/*|worker/*) ;;
+              *) printf 'Unexpected archive entry: %s\n' "$entry" >&2; exit 1 ;;
+            esac
+            case "/$entry/" in
+              */../*|*/./*) printf 'Unsafe archive entry: %s\n' "$entry" >&2; exit 1 ;;
+            esac
+          done < <(tar -tzf "$archive")
+          tar --extract --gzip --file "$archive" --directory "$payload_dir" \
+            --no-same-owner --no-same-permissions
+          test -s "$payload_dir/worker/index.js"
+          test -f "$payload_dir/assets/index.html"
+          version_tag="lmc-prod-$CANDIDATE_SHA-$CI_RUN_ID-$CI_RUN_ATTEMPT-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          node scripts/verify-managed-cloud-artifact.mjs verify-tag "$version_tag" >/dev/null
+          printf 'archive_sha256=%s\n' "$archive_sha256" >>"$GITHUB_OUTPUT"
+          printf 'payload_dir=%s\n' "$payload_dir" >>"$GITHUB_OUTPUT"
+          printf 'version_tag=%s\n' "$version_tag" >>"$GITHUB_OUTPUT"
+      - name: Verify Wrangler deploy identity
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: pnpm --filter @litemcp/managed-cloud exec wrangler whoami
-      - name: Apply checked-in D1 migrations
+      - name: Verify remote production Durable Object lifecycle
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm managed-cloud:do-lifecycle -- --env production
+      - name: Verify Wrangler migration identity
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm --filter @litemcp/managed-cloud exec wrangler whoami
+      - name: Verify the Better Auth migration window
+        env:
+          BETTER_AUTH_1_7_MIGRATION_APPROVED_SHA: ${{ vars.BETTER_AUTH_1_7_MIGRATION_APPROVED_SHA }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SCIM_WRITES_FROZEN: ${{ vars.SCIM_WRITES_FROZEN }}
+        run: pnpm managed-cloud:auth-migration-window -- --env production
+      - name: Upload the prebuilt production Worker version
+        id: worker
+        env:
+          ARCHIVE_SHA256: ${{ steps.artifact.outputs.archive_sha256 }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PAYLOAD_DIR: ${{ steps.artifact.outputs.payload_dir }}
+          VERSION_TAG: ${{ steps.artifact.outputs.version_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          upload_log="$RUNNER_TEMP/wrangler-production-upload.log"
+          pnpm --filter @litemcp/managed-cloud exec wrangler versions upload \
+            "$PAYLOAD_DIR/worker/index.js" \
+            --config wrangler.jsonc \
+            --no-bundle \
+            --assets "$PAYLOAD_DIR/assets" \
+            --env= \
+            --tag "$VERSION_TAG" \
+            --message "CI archive sha256:$ARCHIVE_SHA256" \
+            --strict 2>&1 | tee "$upload_log"
+          version_id="$(node scripts/verify-managed-cloud-artifact.mjs \
+            parse-version "$upload_log")"
+          printf 'version_id=%s\n' "$version_id" >>"$GITHUB_OUTPUT"
+      - name: Apply checked-in production D1 migrations
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: pnpm --filter @litemcp/managed-cloud db:migrate:remote
-      - name: Deploy managed cloud
-        run: pnpm managed-cloud:deploy
-      - name: Run public baseline smoke
+      - name: Verify production migration postflight
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm managed-cloud:auth-migration-window -- --env production
+      - name: Route production traffic to the uploaded Worker version
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VERSION_ID: ${{ steps.worker.outputs.version_id }}
+        run: >-
+          pnpm --filter @litemcp/managed-cloud exec wrangler versions deploy
+          --config wrangler.jsonc --env= --version-id "$VERSION_ID" --yes
+          --message "LiteMCP production exact CI artifact"
+      - name: Verify production routes only to the uploaded Worker version
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VERSION_ID: ${{ steps.worker.outputs.version_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --filter @litemcp/managed-cloud exec wrangler deployments list \
+            --config wrangler.jsonc --env= --json \
+            >"$RUNNER_TEMP/production-deployments.json"
+          node scripts/verify-managed-cloud-artifact.mjs verify-deployment \
+            "$RUNNER_TEMP/production-deployments.json" "$VERSION_ID" >/dev/null
+      - name: Run public and authenticated MCP production smoke
+        env:
+          MANAGED_CLOUD_URL: ${{ vars.MANAGED_CLOUD_URL }}
+          MANAGED_CLOUD_MCP_ENDPOINT: ${{ vars.MANAGED_CLOUD_MCP_ENDPOINT }}
+          MANAGED_CLOUD_MCP_TOKEN: ${{ secrets.MANAGED_CLOUD_MCP_TOKEN }}
+          MANAGED_CLOUD_MCP_TOOL_NAME: ${{ vars.MANAGED_CLOUD_MCP_TOOL_NAME }}
+          MANAGED_CLOUD_MCP_TOOL_ARGUMENTS_JSON: ${{ vars.MANAGED_CLOUD_MCP_TOOL_ARGUMENTS_JSON }}
         run: ./scripts/smoke-managed-cloud.sh
+      - name: Write and verify non-secret production evidence
+        env:
+          ARTIFACT_SHA256: ${{ steps.artifact.outputs.archive_sha256 }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          CI_RUN_ATTEMPT: ${{ needs.qualify.outputs.ci_run_attempt }}
+          CI_RUN_ID: ${{ needs.qualify.outputs.ci_run_id }}
+          DEPLOYMENT_URL: ${{ vars.MANAGED_CLOUD_URL }}
+          STAGING_ARTIFACT_SHA256: ${{ needs.qualify.outputs.staging_artifact_sha256 }}
+          STAGING_RUN_ATTEMPT: ${{ needs.qualify.outputs.staging_run_attempt }}
+          STAGING_RUN_ID: ${{ inputs.staging_run_id }}
+          STAGING_WORKER_VERSION_ID: ${{ needs.qualify.outputs.staging_worker_version_id }}
+          WORKER_VERSION_ID: ${{ steps.worker.outputs.version_id }}
+          WORKER_VERSION_TAG: ${{ steps.artifact.outputs.version_tag }}
+        run: |
+          node --input-type=module - <<'NODE'
+          import { readdirSync, writeFileSync } from "node:fs";
+          import { join } from "node:path";
+
+          const evidence = {
+            version: 1,
+            repository: process.env.GITHUB_REPOSITORY,
+            candidate_sha: process.env.CANDIDATE_SHA,
+            ci_run_id: Number(process.env.CI_RUN_ID),
+            ci_run_attempt: Number(process.env.CI_RUN_ATTEMPT),
+            staging_run_id: Number(process.env.STAGING_RUN_ID),
+            staging_run_attempt: Number(process.env.STAGING_RUN_ATTEMPT),
+            staging_artifact_sha256: process.env.STAGING_ARTIFACT_SHA256,
+            staging_worker_version_id: process.env.STAGING_WORKER_VERSION_ID,
+            production_run_id: Number(process.env.GITHUB_RUN_ID),
+            production_run_attempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+            deployment_target: "production",
+            deployment_url: process.env.DEPLOYMENT_URL,
+            artifact_target: "production",
+            artifact_sha256: process.env.ARTIFACT_SHA256,
+            worker_version_id: process.env.WORKER_VERSION_ID,
+            worker_version_tag: process.env.WORKER_VERSION_TAG,
+            migration_ids: readdirSync("apps/managed-cloud/migrations")
+              .filter((name) => name.endsWith(".sql"))
+              .sort(),
+            public_smoke: true,
+            authenticated_mcp_smoke: true,
+            accepted_at: new Date().toISOString(),
+          };
+          writeFileSync(
+            join(process.env.RUNNER_TEMP, "managed-cloud-production-evidence.json"),
+            `${JSON.stringify(evidence, null, 2)}\n`
+          );
+          NODE
+          node scripts/verify-workflow-evidence.mjs production \
+            "$RUNNER_TEMP/managed-cloud-production-evidence.json" \
+            "$CANDIDATE_SHA" "$GITHUB_RUN_ID" "$GITHUB_REPOSITORY"
+      - name: Publish immutable production evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: managed-cloud-production-evidence-${{ inputs.candidate_sha }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/managed-cloud-production-evidence.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Record acceptance boundary
         run: >-
           printf '%s\n'
-          'Deployment and public baseline smoke passed. Live identity-provider, authenticated control-plane, scoped MCP, audit, and rollback acceptance must still be recorded before production-readiness is claimed.'
+          'Production smoke and exact Worker-version evidence passed. Identity/session issuance, audit correlation, revocation, rollback, load, and external security acceptance remain separate release gates.'

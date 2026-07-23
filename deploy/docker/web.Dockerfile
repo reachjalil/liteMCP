@@ -1,8 +1,10 @@
 ARG NODE_IMAGE=node:24-alpine
+ARG NGINX_RUNTIME_IMAGE=nginxinc/nginx-unprivileged:1.29-alpine@sha256:0c79d56aee561a1d81c63f00eee5fb5fe29279560cdc55e91425133104c7fbe6
 
 FROM ${NODE_IMAGE} AS build
 
 ARG PNPM_VERSION=10.30.2
+ARG SIGNUPS_ENABLED=false
 WORKDIR /workspace
 
 RUN corepack enable && corepack prepare "pnpm@${PNPM_VERSION}" --activate
@@ -14,7 +16,10 @@ COPY packages ./packages
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @litemcp/web... build
 
-FROM nginxinc/nginx-unprivileged:1.28-alpine AS runtime
+FROM ${NGINX_RUNTIME_IMAGE} AS runtime
+
+USER root
+RUN apk upgrade --no-cache
 
 ENV API_UPSTREAM=http://server:8787 \
     NGINX_ENVSUBST_FILTER=API_UPSTREAM

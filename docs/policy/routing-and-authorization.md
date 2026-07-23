@@ -184,18 +184,16 @@ hidden tool's sensitive schema or existence beyond what remediation requires.
 
 ## Approval binding
 
-An approval request binds:
+The current approval request binds tenant, requester/session, composition
+version, server version/revision/schema/execution configuration, active policy
+version, authorization epoch, canonical tool, and normalized argument digest.
+It stores no argument payload. A decision must echo the current generation and
+fingerprint, and a different approver consumes the approval only when the
+client retries that exact context once.
 
-- organization, requester, tool stable ID and origin version;
-- composition and policy versions;
-- connected-account reference;
-- normalized argument digest and optional encrypted argument object reference;
-- requested transforms and destination;
-- expiry, required approver role/group, and separation-of-duty requirement.
-
-Approval creates a one-time grant for that exact binding. Changed arguments,
-tool version, account, policy-invalidating revocation, or expiry require a new
-request. Decisions and attempts are immutable and auditable.
+Connected-account references, transform/destination constraints, encrypted
+argument custody, server-side resume, immutable decision history, and native
+notification integrations remain target behavior rather than current evidence.
 
 ## Route selection
 
@@ -228,29 +226,34 @@ exclusions, chosen route, health snapshot revision, and fallback decision.
 
 ## Rate limits, quotas, and concurrency
 
-The decision may attach limits at organization, environment, principal,
-session, connection, capability, and upstream levels. The strictest applicable
-limit wins. Cloudflare coordination that requires exact counters uses a Durable
-Object rather than eventually consistent KV. Kubernetes uses MongoDB atomic
-counters or a configured Valkey adapter with an auditable fallback policy.
-Limit errors are transparent and point to fair-use/self-host guidance; there is
-no paid cloud upgrade path.
+The current implementation enforces organization-level defaults for stored
+servers, compositions, active sessions, and tool calls per UTC day. Cloudflare
+routes those records, counters, and short-lived quota reservations through the
+tenant Durable Object.
+Limit errors are explicit `429` responses and point to the published
+[`managed-cloud-fair-use.md`](./managed-cloud-fair-use.md) guidance. There is no
+paid cloud increase path.
+
+Environment-, principal-, connection-, capability-, and upstream-specific
+quotas remain designed. Executors have bounded per-tenant/server concurrency,
+but general HTTP/MCP request-rate limits, organization-wide concurrency caps, a
+Valkey-backed Kubernetes limiter, and WAF coverage are not implemented claims.
 
 ## Versioning and persistence
 
-- Draft policy documents may change; activated versions are immutable.
-- Activation is a security-sensitive mutation serialized by an
-  organization-scoped Durable Object on Cloudflare and a MongoDB transaction on
-  Kubernetes.
-- The transition writes the active pointer, revocation/cache epoch, audit event,
-  and outbox record as one logical mutation.
-- KV holds signed read projections. The gateway verifies version/hash and
-  maximum age before use.
-- Rollback activates a prior immutable version as a new audited transition; it
-  does not erase history.
+- Draft policy documents may change; activated policy documents reject edits.
+- Activation first CAS-publishes the linted target document, then CAS-swaps the
+  tenant authority pointer and authorization epoch; a losing pointer race
+  attempts to restore the target to draft.
+- Cloudflare serializes each involved document through the tenant Durable
+  Object. MongoDB supports transactions, but this workflow does not currently
+  wrap the policy, authority, audit, and an outbox in one transaction.
+- Previous-policy archival and audit are follow-up documents. There is no
+  immutable rollback history, signed projection, or transactional outbox claim.
 
-The Cloudflare KV-only MVP cannot claim concurrency-safe production policy
-activation until Durable Object serialization is implemented and tested.
+These steps fail closed for the current read path but are not an atomic
+multi-record promotion. Deployment, contention/failure, and recovery evidence
+remain required before production concurrency claims.
 
 ## Simulator and dry run
 

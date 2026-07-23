@@ -16,7 +16,9 @@
     "astro": "catalog:",
     "better-auth": "catalog:",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "react-is": "catalog:",
+    "recharts": "catalog:"
   },
   "devDependencies": {
     "@astrojs/check": "catalog:",

@@ -1,0 +1,12 @@
+{
+  "exceptions": [
+    {
+      "advisory": "GHSA-f88m-g3jw-g9cj",
+      "package": "sharp",
+      "versions": ["0.34.5"],
+      "paths": ["apps__managed-cloud>wrangler>miniflare>sharp"],
+      "expires": "2026-08-15",
+      "rationale": "Wrangler 4.113.0 currently pins Miniflare to sharp 0.34.5. This dependency is used by the local/CI deployment toolchain and is excluded from production dependencies; LiteMCP does not pass untrusted images to it. Upgrade Wrangler as soon as Miniflare adopts sharp 0.35 or newer."
+    }
+  ]
+}

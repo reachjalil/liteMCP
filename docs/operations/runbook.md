@@ -35,8 +35,10 @@ docker compose -f deploy/docker-compose/compose.yaml config
 pnpm docker:up
 ```
 
-Use this for a disposable or controlled evaluation. The checked-in stack does
-not yet claim production Mongo authentication or a recorded restore exercise.
+Use this for a disposable or controlled evaluation. The checked-in stack enables
+Mongo client authentication and replica-set keyfile authentication, but uses a
+single member and the bootstrap/root account. It has no recorded complete-stack
+or restore exercise and is not a production database topology.
 
 ### Kubernetes
 
@@ -92,17 +94,26 @@ At a frequency appropriate to the environment:
 
 - review error rate, latency, timeout, and bounded-response failures;
 - review denied, approval-required, and revocation events;
+- when Insight is enabled, compare the tenant dashboard with exact `/usage`,
+  inspect analytics drop/failure counters, and verify that recent events never
+  contain arguments or results;
 - confirm Mongo replication, capacity, backup freshness, and restore sampling;
 - review IdP/SCIM sync failures and authorization-version lag once implemented;
 - validate certificate and provider-secret expiry;
 - review upstream DNS/egress changes and allowlists;
-- confirm audit retention and export jobs;
+- confirm audit retention/export jobs separately from Mongo analytics TTL or
+  the managed count-capped feed;
 - scan images/dependencies and rebuild from the supported branch;
 - exercise one allowed and denied MCP capability from an approved client.
 
-OpenTelemetry, SIEM export, quotas, and production dashboards are designed but
-not complete in the current slice. Operators must supply compensating platform
-monitoring until those surfaces ship.
+The working tree includes payload-free tenant analytics APIs and six console
+views, but they have no deployment, browser, named-client, or load acceptance.
+Managed queries read a capped exact feed and do not query Analytics Engine SQL;
+the Live view polls and has no WebSocket/SSE transport. OpenTelemetry, configured
+alerts, weekly digests, and SIEM export remain absent (O-F is outstanding).
+Fixed organization quotas and request-correlated Sentry also have no deployed
+alert or capacity evidence. Operators must supply compensating platform
+monitoring until those surfaces pass acceptance.
 
 ## Backup and restore
 
@@ -159,8 +170,9 @@ evidence. Do not return a provider token to an MCP client.
 - stop sensitive dispatch if pre-dispatch evidence cannot be written;
 - preserve database snapshots and application logs;
 - compare sequence/hash continuity per tenant;
-- treat Workers KV audit ordering as insufficient for production multi-writer
-  assurance until a strongly consistent coordinator exists.
+- verify that the current per-tenant Durable Object audit authority is deployed
+  and migrated; its per-document serialization still does not provide a
+  transactional outbox or an externally anchored ledger.
 
 ### SSRF or unexpected egress
 
@@ -192,6 +204,156 @@ The same smoke expectations apply to `apps/managed-cloud`, plus D1 migration,
 KV/D1 binding, asset, custom-domain, and rollback checks. A Wrangler dry-run is
 build evidence only. Do not record a live release until an authenticated deploy
 and smoke suite pass against the deployed URL.
+
+Use the exact-CI-artifact workflows as a promotion chain:
+
+1. CI validates one full main-branch SHA, including Harness convergence,
+   production dependency audit, Python SDK tests, workflow policy, local D1
+   migration/schema parity, renders, scans, builds, and tests. It builds the
+   environment-specific production and staging Worker/static-asset archives
+   once without Cloudflare credentials and records each SHA-256 digest.
+2. The staging workflow verifies the exact CI run, attempt, and SHA; rejects a
+   stale successful run; deploys it; requires public plus authenticated
+   read-only MCP smoke; and publishes non-secret evidence tied to the staging
+   run attempt.
+3. Production is manually dispatched with the same SHA and staging run ID. It
+   rejects missing, expired, cross-repository, failed, or mismatched evidence
+   before entering the workflow-declared production environment.
+4. Mutation runs are serialized and a newer run cannot automatically cancel an
+   active run. Manual cancellation and job timeouts remain possible; a schema
+   migration is not reversed merely because the application rolls back.
+
+This chain is available only after a separately reviewed Durable Object
+lifecycle bootstrap/upgrade. Cloudflare requires `wrangler deploy` for the first
+Worker and for a pending legacy `migrations` change; `versions upload` cannot do
+either. Apply the exact verified CI archive with secure first-deploy secrets and
+full maintenance/write-freeze controls by following
+[`cloudflare-durable-object-lifecycle.md`](./cloudflare-durable-object-lifecycle.md).
+Both promotion workflows query the active Worker settings and require the final
+checked-in migration tag and both bindings before uploading a version.
+
+Staging verifies the archive hash, uploads with `--no-bundle`, parses the Worker
+version UUID, deploys that UUID, and confirms it receives 100% of traffic before
+writing evidence. Production consumes the separately built production archive
+from the same CI run and retains both the staging and production artifact/version
+identities. The target archives intentionally differ because public origins and
+bindings differ; source SHA plus CI run/attempt binds the pair.
+
+Wrangler `versions upload`/`versions deploy` does not apply routes, custom
+domains, or other triggers. Bootstrap and future trigger changes are separate
+reviewed mutations: run `wrangler triggers deploy` for the explicit target, then verify account
+ownership, DNS/TLS, and the exact configured origin before asserting the
+environment's resource-ready marker. The automated workflows intentionally do
+not widen their token scope to manage triggers or Durable Object lifecycle.
+
+For an incompatible schema transition, the enforced order is read-only
+preflight, verified remote Durable Object lifecycle, inactive Worker upload and
+UUID capture, D1 apply, full-schema
+postflight, traffic switch to that UUID, route verification, and smoke. This
+ensures the deployable application version exists before the database changes;
+it does not remove the need for a real maintenance/write freeze.
+
+A lifecycle-changing release is a different boundary because `wrangler deploy`
+changes the active Worker immediately and rollback cannot cross the lifecycle
+change. Prefer a backward-compatible preparatory release. If an approved
+maintenance operation must combine the current lifecycle and D1 transitions,
+keep the external write block active and recover forward through D1 postflight
+and smoke as described in the lifecycle runbook.
+
+If a run is canceled or times out, treat it as a partial mutation rather than a
+rollback. Inspect the D1 migration ledger, rerun the migration-window postflight,
+list Worker versions and deployments, and compare the version tag/UUID with the
+CI artifact digest. Rerun the workflow with the same candidate; D1 skips recorded
+migrations and the workflow creates a new run-attempt-bound Worker version. Do
+not upload evidence or expand traffic until the exact version, 100% routing
+check, and public/authenticated smoke all pass. If database state and the
+migration ledger disagree, stop and restore the reviewed recovery point.
+
+The workflow declaration does not configure GitHub repository controls. Before
+enabling mutation, repository administrators must require the `Required checks`
+job on `main`, restrict deployment branches, and configure required reviewers
+for both managed-cloud environments. The current upstream repository has no
+branch rule/ruleset and no environment protection rules, so do not describe its
+deployment path as protected yet.
+
+### Better Auth 1.7 SCIM upgrade
+
+Migration `0003_better_auth_1_7_scim.sql` adds the Better Auth 1.7 JWK and SCIM
+schema, rekeys providers, and rewrites provisioned account provider IDs. First
+prove that the checked-in migrations match the generated schema:
+
+```bash
+pnpm managed-cloud:auth-schema:check
+```
+
+Exercise the credential-free gate logic in CI, then run the read-only remote
+preflight for the exact target before either migration:
+
+```bash
+pnpm managed-cloud:auth-migration-window -- --self-test
+
+auth_candidate_sha="$(git rev-parse HEAD)"
+SCIM_WRITES_FROZEN=true \
+CANDIDATE_SHA="$auth_candidate_sha" \
+BETTER_AUTH_1_7_MIGRATION_APPROVED_SHA="$auth_candidate_sha" \
+  pnpm managed-cloud:auth-migration-window -- --env staging
+```
+
+Use `--env production` for the separately approved production candidate. While
+the migration is pending, the preflight accepts only the literal write-freeze
+attestation and requires both SHA variables to be the same full lowercase
+commit SHA. Once the migration ledger and upgraded schema agree, the temporary
+attestations are no longer required. The preflight reports only non-secret
+provider and organization identifiers. The D1 migration stops before changing
+application tables when a provider is unscoped, has no live owning
+organization, has an invalid legacy key/token, uses a reserved Better Auth
+account provider ID (`credential`, `email-otp`, `magic-link`, `phone-number`,
+`anonymous`, or `siwe`), collides with an SSO provider, or already has accounts
+in the destination 1.7 namespace. A reserved ID is ambiguous because 1.6 used
+the same plain account namespace for SCIM-managed and built-in authentication
+accounts; do not bulk-rekey it. Remediate from trusted ownership evidence, take
+a tested backup, and rerun the preflight; never invent a tenant or print
+`scimToken`.
+
+`SCIM_WRITES_FROZEN=true` is an operator attestation, not a runtime switch. Block
+SCIM/auth writes using the reviewed account/WAF/token/maintenance control and
+verify that boundary independently before approving the environment job. Keep
+it enforced until the new Worker UUID owns traffic and post-deploy smoke passes.
+
+For the portable MongoDB deployment, run the read-only planner against a restored
+staging copy before applying the same data transition:
+
+```bash
+MONGODB_URI="$MONGODB_URI" MONGODB_DATABASE=litemcp \
+  pnpm --filter @litemcp/server auth:migrate:1.7:check
+
+BETTER_AUTH_MIGRATION_BACKUP_CONFIRMED=true \
+BETTER_AUTH_MIGRATION_SCIM_WRITES_FROZEN=true \
+MONGODB_URI="$MONGODB_URI" MONGODB_DATABASE=litemcp \
+  pnpm --filter @litemcp/server auth:migrate:1.7:apply
+
+MONGODB_URI="$MONGODB_URI" MONGODB_DATABASE=litemcp \
+  pnpm --filter @litemcp/server auth:migrate:1.7:check
+```
+
+The apply mode requires a replica-set transaction with majority write concern,
+an explicit backup confirmation, and an explicit assertion that SCIM writes are
+frozen. It records data-rekeyed and complete phases separately, verifies the
+exact 1.7 unique indexes, and removes the obsolete globally unique MongoDB
+`providerId` index only after the replacement `providerKey` index exists. The
+old application cannot read the new organization-scoped SCIM account keys,
+while the new application cannot use the old schema. Keep traffic/writes in the
+reviewed maintenance state, deploy every application replica immediately, and
+treat application-only rollback as unsafe unless the database is restored
+through the reviewed recovery plan.
+
+Accounts left behind after a 1.6 SCIM provider connection was deleted cannot be
+mapped automatically because the provider-to-organization evidence is gone.
+Inventory and remediate that class from trusted historical identity evidence;
+do not guess from email, account ID, or a similarly named provider.
+
+Manual dispatch grants mutation authority only; it never waives a failed CI,
+staging, security, or acceptance gate.
 
 ## Escalation and evidence
 

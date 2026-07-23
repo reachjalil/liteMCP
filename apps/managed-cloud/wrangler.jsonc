@@ -31,15 +31,47 @@
   "vars": {
     "PUBLIC_ORIGIN": "https://litemcpcomposer.com",
     "WEB_ORIGINS": "https://litemcpcomposer.com,https://www.litemcpcomposer.com",
-    "LITEMCP_DEMO_MODE": "false"
+    "LITEMCP_DEMO_MODE": "false",
+    "SIGNUPS_ENABLED": "false",
+    "ANALYTICS_ENABLED": "true",
+    "TENANT_FEED_MAX_EVENTS": "500",
+    "SENTRY_ENVIRONMENT": "production"
   },
   "secrets": {
-    "required": ["BETTER_AUTH_SECRET"]
+    "required": ["BETTER_AUTH_SECRET", "CREDENTIAL_MASTER_KEY"]
   },
   "kv_namespaces": [
     {
       "binding": "DATA_KV",
       "id": "cb5e64d2de304e28b194c6685478f2bf"
+    }
+  ],
+  "analytics_engine_datasets": [
+    {
+      "binding": "USAGE_ANALYTICS",
+      "dataset": "litemcp_usage_production"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "TENANT_AUTHORITY",
+        "class_name": "TenantAuthorityDurableObject"
+      },
+      {
+        "name": "TENANT_FEED",
+        "class_name": "TenantFeedDurableObject"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-tenant-authority",
+      "new_sqlite_classes": ["TenantAuthorityDurableObject"]
+    },
+    {
+      "tag": "v2-tenant-feed",
+      "new_sqlite_classes": ["TenantFeedDurableObject"]
     }
   ],
   "d1_databases": [
@@ -48,5 +80,62 @@
       "database_name": "litemcp-auth",
       "database_id": "9f74df58-8248-42be-b23f-2e86797adbcf"
     }
-  ]
+  ],
+  "env": {
+    "staging": {
+      "name": "litemcp-staging",
+      "workers_dev": false,
+      "routes": [
+        {
+          "pattern": "staging.litemcpcomposer.com",
+          "custom_domain": true
+        }
+      ],
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1
+      },
+      "vars": {
+        "PUBLIC_ORIGIN": "https://staging.litemcpcomposer.com",
+        "WEB_ORIGINS": "https://staging.litemcpcomposer.com",
+        "LITEMCP_DEMO_MODE": "false",
+        "SIGNUPS_ENABLED": "false",
+        "ANALYTICS_ENABLED": "true",
+        "TENANT_FEED_MAX_EVENTS": "500",
+        "SENTRY_ENVIRONMENT": "staging"
+      },
+      "secrets": {
+        "required": ["BETTER_AUTH_SECRET", "CREDENTIAL_MASTER_KEY"]
+      },
+      "kv_namespaces": [
+        {
+          "binding": "DATA_KV"
+        }
+      ],
+      "analytics_engine_datasets": [
+        {
+          "binding": "USAGE_ANALYTICS",
+          "dataset": "litemcp_usage_staging"
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "TENANT_AUTHORITY",
+            "class_name": "TenantAuthorityDurableObject"
+          },
+          {
+            "name": "TENANT_FEED",
+            "class_name": "TenantFeedDurableObject"
+          }
+        ]
+      },
+      "d1_databases": [
+        {
+          "binding": "AUTH_DB",
+          "database_name": "litemcp-auth-staging"
+        }
+      ]
+    }
+  }
 }

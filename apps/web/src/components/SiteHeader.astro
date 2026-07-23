@@ -12,10 +12,10 @@ const isActive = (href: string) =>
 
 <div class="site-notice">
   <div class="shell site-notice__inner">
-    <span>Apache 2.0</span>
+    <span>The Open Charter · Apache 2.0</span>
     <span aria-hidden="true">/</span>
-    <span>Pre-1.0 · managed cloud and self-hosted previews</span>
-    <a href="/open-source">Read the open-source commitment <span aria-hidden="true">→</span></a>
+    <span>Pre-1.0 · tested local slice · production acceptance pending</span>
+    <a href="/docs/getting-started#five-minute-proof">Begin the local trial <span aria-hidden="true">→</span></a>
   </div>
 </div>
 <header class="site-header">
@@ -34,7 +34,7 @@ const isActive = (href: string) =>
               </summary>
               <div class="nav-popover__panel">
                 <div class="nav-popover__heading">
-                  <span class="eyebrow">Platform</span>
+                  <span class="eyebrow">The Gatehouse</span>
                   <strong>One governed MCP entry point.</strong>
                 </div>
                 <div class="nav-popover__links">
@@ -65,8 +65,8 @@ const isActive = (href: string) =>
         <span class="theme-toggle__light" aria-hidden="true">◐</span>
         <span class="theme-toggle__dark" aria-hidden="true">◑</span>
       </button>
-      <a class="button button--quiet button--small header-login" href="/login">Sign in</a>
-      <a class="button button--primary button--small" href="/app">Open console</a>
+      <a class="button button--quiet button--small header-login" href="https://github.com/reachjalil/liteMCP">GitHub ↗</a>
+      <a class="button button--primary button--small" href="/design-partners">Apply for the pilot</a>
       <details class="mobile-nav">
         <summary aria-label="Open navigation"><span></span><span></span></summary>
         <div class="mobile-nav__panel">
@@ -76,9 +76,9 @@ const isActive = (href: string) =>
           {publicNavigation.filter((item) => item.label !== "Product").map((item) => (
             <a href={item.href}>{item.label}</a>
           ))}
-          <a href="/security">Security</a>
-          <a href="/changelog">Changelog</a>
-          <a href="/blog">Blog</a>
+          <a href="/cloud">Managed cloud status</a>
+          <a href="https://github.com/reachjalil/liteMCP">GitHub ↗</a>
+          <a href="/login">Invited-user sign in</a>
         </div>
       </details>
     </div>

@@ -26,8 +26,8 @@ const { page } = Astro.props;
     signal={`${page.stage} · ${page.signal}`}
   >
     <Fragment slot="actions">
-      <a class="button button--primary button--large" href="/app">Open console</a>
-      <a class="button button--large" href="/docs">Read documentation</a>
+      <a class="button button--primary button--large" href="/docs/getting-started#five-minute-proof">Run the local proof</a>
+      <a class="button button--large" href="/design-partners">Qualify a pilot</a>
     </Fragment>
   </PageHero>
 
@@ -43,9 +43,9 @@ const { page } = Astro.props;
         <dt>Preview</dt>
         <dd>Useful implementation exists, but the complete operating journey is not proven.</dd>
         <dt>Planned</dt>
-        <dd>Part of the open MCP-native roadmap, not current product behavior.</dd>
+        <dd>Part of the public product roadmap, not current product behavior.</dd>
         <dt>Deployment</dt>
-        <dd>Managed cloud and self-hosted targets share portable packages; live parity remains an acceptance test.</dd>
+        <dd>Managed cloud consumes the portable public product core; its private service-control plane is not required by self-hosting.</dd>
       </dl>
     </div>
   </section>
@@ -95,12 +95,12 @@ const { page } = Astro.props;
   <section class="content-section content-section--tight">
     <div class="shell cta-panel">
       <div>
-        <h2>Evaluate locally or inspect either deployment target.</h2>
-        <p>The managed cloud and Kubernetes paths are previews of one open codebase, with no intended capability gate or mandatory call-home path.</p>
+        <h2>Evaluate the tested local slice before choosing a deployment target.</h2>
+        <p>The public product core remains self-hostable and call-home-free. Managed cloud is an invite-only operated-service track; neither target has completed production acceptance.</p>
       </div>
       <div class="cta-panel__actions">
-        <a class="button button--primary" href="/cloud">Managed cloud preview</a>
-        <a class="button" href="/docs/self-hosting">Kubernetes preview</a>
+        <a class="button button--primary" href="/design-partners">Review pilot fit</a>
+        <a class="button" href="/docs/self-hosting">Inspect self-hosting evidence</a>
       </div>
     </div>
   </section>

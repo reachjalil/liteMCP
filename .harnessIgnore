@@ -1,0 +1,2 @@
+# Keep global projection rules intentionally empty. Scoped rules live beside
+# the source roots they govern.

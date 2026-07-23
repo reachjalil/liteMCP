@@ -13,6 +13,9 @@ with the two status files before relying on any capability in production.
   plane, credential plane, and deployment topology.
 - [`mcp-native-positioning.md`](./mcp-native-positioning.md) — MCP-native
   category, differentiation, product wedge, and proof requirements.
+- [`design-partner-program.md`](./design-partner-program.md) — ideal partner,
+  four-week pilot contract, activation/retention evidence, pricing hypotheses,
+  and the gate between product proof and market proof.
 - [`feature-reference.md`](./feature-reference.md) — current capability catalog
   with Available now, Preview, Designed, and Blocked labels.
 - [`requirements-traceability.md`](./requirements-traceability.md) — stable
@@ -21,6 +24,12 @@ with the two status files before relying on any capability in production.
   composition, session, discovery, execution, approval, and failure behavior.
 - [`api-and-sdk-reference.md`](./api-and-sdk-reference.md) — control-plane API,
   MCP endpoint, TypeScript/Python SDKs, CLI, and concrete requests.
+- [`mcp-client-compatibility.md`](./mcp-client-compatibility.md) — named-client
+  evidence matrix, implemented MCP surface, blockers, and verification record.
+- [`managed-cloud-fair-use.md`](./managed-cloud-fair-use.md) — published free
+  defaults, counting semantics, enforcement behavior, and non-SLA boundary.
+- [`usage-observability.md`](./usage-observability.md) — Insight Plane event,
+  attribution, storage, API, console, privacy, retention, and evidence boundary.
 - [`console-guide.md`](./console-guide.md) — authenticated/demo modes, each
   console area, current workflows, errors, and planned enterprise surfaces.
 - [`configuration-reference.md`](./configuration-reference.md) — Node,

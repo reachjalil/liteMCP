@@ -69,7 +69,7 @@ The research evidence keys cited below resolve through the
 
 | Conflict | Research/reference position | Authoritative LiteMCP Composer decision |
 | --- | --- | --- |
-| Commercial boundary | Research proposes paid cloud tiers and paid enterprise features | Managed cloud and self-hosted software are free; no feature gates or checkout; contracts sell operational service and accountability |
+| Commercial boundary | Research proposes paid cloud tiers and paid enterprise features | The independently operable product stays Apache-2.0; a private sibling may sell and operate hosted plans, billing, customer lifecycle, fleet operations, and support without adding self-host license enforcement |
 | Database | Research defaults to PostgreSQL source of truth; reference mixes D1, KV, and Durable Objects | Product state uses a portable NoSQL `DocumentStore`: KV MVP plus Durable Object serialization on Cloudflare, MongoDB replica set on Kubernetes; Better Auth uses D1/MongoDB separately |
 | Web delivery | Reference favors Astro server output for Cloudflare applications | Public site and console use Astro static output plus React islands; Hono is a separate portable API/runtime boundary |
 | Policy technology | Research suggests OPA when no repository pattern exists | Use a typed, deterministic, open policy schema/evaluator that runs identically in Workers and Node; leave a policy-engine adapter seam |

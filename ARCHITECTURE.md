@@ -5,8 +5,8 @@ Status: implemented vertical-slice baseline with explicitly tracked gaps. See
 
 ## Purpose
 
-LiteMCP Composer is an open-source, MCP-native enterprise composition control
-plane. MCP composition is its primary domain—not a compatibility surface added
+LiteMCP Composer has an open-source, MCP-native enterprise composition product
+core. MCP composition is its primary domain—not a compatibility surface added
 to an LLM gateway or general workflow product. It gives an organization one
 stable MCP entry point while retaining the identity, origin, schema, version,
 credential, policy, and route context of every upstream capability.
@@ -19,7 +19,8 @@ The architecture optimizes for:
 - discovery and execution governed by the same policy decision model;
 - per-user and shared connected accounts without exposing reusable secrets;
 - deterministic routing, explainable decisions, and safe failover;
-- a free managed cloud and a complete, no-call-home self-hosted distribution;
+- an optional LiteMCP-operated cloud and a complete, no-call-home self-hosted
+  distribution with the same tenant product capabilities;
 - open configuration and tested cloud-to-on-premises portability;
 - a modular first production system rather than unnecessary microservices.
 
@@ -36,8 +37,10 @@ The architecture optimizes for:
 4. Better Auth establishes application identity and sessions. It is not the
    authorization boundary. The Hono API and MCP gateway enforce authorization
    independently.
-5. Tool payloads are not retained by default. Secrets never enter ordinary
-   logs, traces, URLs, MCP descriptors, or client-visible errors.
+5. Tool payloads are not retained by default. The Insight Plane accepts only a
+   strict bounded dimensions-and-measures contract; secrets, arguments,
+   results, emails, and display names never enter analytics, ordinary logs,
+   traces, URLs, MCP descriptors, or client-visible errors.
 6. An upstream capability is never flattened so far that its origin, version,
    schema, risk class, or policy identity is lost.
 
@@ -56,7 +59,9 @@ flowchart LR
   Gateway --> Credentials["Credential plane"]
   Gateway --> Upstreams["Remote MCP, legacy SSE, stdio, and API adapters"]
   Events --> Upstreams
-  Gateway --> Telemetry["Audit and OpenTelemetry"]
+  Gateway --> Audit["Audit chain (fail closed)"]
+  Gateway --> Insight["Insight Plane (fail open)"]
+  API --> Insight
 ```
 
 ## Logical planes
@@ -68,6 +73,7 @@ flowchart LR
 | Credential | Auth profiles, OAuth callbacks, token lifecycle, vault references, and short-lived execution grants | Plaintext-secret access and key custody |
 | Execution | Supervised stdio and untrusted connector/container execution | Process, filesystem, resource, image, and egress isolation |
 | Event | Triggers, health checks, refresh, retries, dead letters, and approval resumption | Idempotency, replay protection, and durable delivery |
+| Insight | Payload-free usage facts, deterministic aggregation, exact usage standing, and tenant analytics queries | Tenant injection, bounded cardinality/ranges, and separation from authority/audit |
 
 These are logical boundaries. The first implementation may deploy the control
 plane as one modular Hono service and scale the gateway and worker separately.
@@ -115,26 +121,30 @@ level or reject the operation.
 
 | Need | Cloudflare service | Current architectural use |
 | --- | --- | --- |
-| Product documents and read models | Workers KV | MVP storage adapter; eventual consistency is explicit |
-| Serialized tenant mutations | Durable Objects | Planned for authz/policy/composition membership writes before production readiness |
+| Non-authoritative product/read-model documents | Workers KV | Organizations, environments, activation events, and other records whose eventual consistency is explicit |
+| Authorization/execution-sensitive documents | Durable Objects | Working-tree tenant authority for sessions, roles/IdPs, servers/compositions/policies, approvals, service principals, OAuth, quotas, and audit; per-document CAS only |
 | Better Auth persistence | D1 | Separate `AuthStore`; not the product `DocumentStore` |
+| Usage trends | Workers Analytics Engine | Tenant-indexed, payload-free, fail-open emission; not an authority or audit store |
+| Exact recent analytics | Sibling tenant feed Durable Object | Capped exact event ring for current queries; isolated from the tenant authority object |
 | Artifacts, exports, files, provenance | R2 | Content-addressed objects and signed metadata |
 | Async delivery | Queues and scheduled Workers | Outbox dispatch, health, triggers, refresh, and dead letters |
 | Secrets and wrapping keys | Worker secrets plus a vault/KMS adapter | Configuration references only; no product document stores plaintext |
 
 KV alone cannot safely coordinate concurrent policy activation, group changes,
-composition publication, approval decisions, or credential rotation. The MVP
-may demonstrate single-writer flows, but production readiness requires a
-Durable Object keyed by organization (or a narrower contention domain) to
-serialize such mutations. The object writes an immutable version and outbox
-record, then updates KV projections. Readers must carry the selected version or
-revision so stale projections fail closed.
+composition publication, approval decisions, or credential rotation. The
+working tree therefore routes the current security-sensitive document set
+through a Durable Object keyed by organization. This provides serialized
+per-document revisions; it does not yet write a compound immutable version,
+outbox record, and projections atomically. Production readiness still requires
+deployment, migration, failure/latency evidence, and explicit recovery for
+multi-document transitions.
 
 ### Kubernetes mapping
 
 | Need | Kubernetes/default service |
 | --- | --- |
 | Product documents, transactions, and outbox | MongoDB replica set |
+| Usage analytics | MongoDB `usage_events` time-series collection with tenant metadata and TTL |
 | Better Auth persistence | Better Auth MongoDB adapter, logically separated collections and credentials |
 | Artifacts and files | S3-compatible object storage |
 | Cache or distributed rate-limit acceleration | Optional Valkey-compatible service, only when measured need exists |
@@ -174,10 +184,10 @@ Organization
   Composition -> CompositionVersion -> CompositionMember
     ToolAlias / RouteRule / PolicyBinding
   AuthProfile -> ConnectedAccount -> CredentialReference
-  GatewayEndpoint -> GatewaySession
+  GatewayEndpoint -> GatewaySession -> SessionClientAttribution
   TriggerDefinition -> Subscription
   ApprovalRequest -> Execution
-  AuditEvent / HealthSample / ReleaseChannel
+  AuditEvent / UsageEvent / HealthSample / ReleaseChannel
 ```
 
 Published server, skill, composition, connector, and policy versions are
@@ -198,7 +208,8 @@ The downstream endpoint must:
 7. re-evaluate authorization at execution time;
 8. select a route deterministically and obtain a narrow execution grant;
 9. propagate cancellation, trace context, timeout, and safe idempotency data;
-10. classify the result and append audit metadata without payloads.
+10. classify the result, append required audit metadata without payloads, and
+    separately emit one fail-open usage fact.
 
 Hidden capabilities remain denied when invoked by guessed name or stale client
 cache. Discovery caches are invalidated by identity, group, policy,
@@ -238,17 +249,55 @@ Detailed requirements live in
 
 ## Events and observability
 
-Events use versioned CloudEvents-compatible envelopes and at-least-once
-delivery. Consumers deduplicate by event ID and tenant-scoped sequence.
-Required families include configuration publication, health/schema change,
-artifact publication/revocation, connection lifecycle, policy decisions,
-approvals, executions, triggers, and suspected security events.
+Audit and usage analytics are deliberately different pipelines. Required audit
+checkpoints remain redacted, sequence/hash linked, and fail closed before
+dispatch. `UsageEvent` emission is higher-volume, query-oriented, and always
+fail open: validation, scheduling, queue, or sink failure is counted or
+reported but cannot change an MCP or control-plane result.
 
-OpenTelemetry spans correlate downstream request, policy, route, credential,
-approval, worker, and upstream operations. Default telemetry includes IDs,
-versions, duration, result class, attempts, and byte counts—not tool arguments,
-results, or secrets. Self-hosted telemetry is disabled unless directed to a
-customer endpoint or explicitly opted in.
+The strict usage contract contains bounded tenant, session, opaque subject,
+composition, server, canonical tool, policy/rule, approval, status, latency,
+and byte-count fields. It rejects unmodelled fields rather than silently
+retaining them. Tool arguments/results, emails, and display names are absent.
+Client name/version comes from MCP `initialize` and is self-reported, not
+cryptographic client identity. The first valid initialize wins a separate
+tenant-scoped `session-attributions` document through a create-only revision;
+this never rewrites the authorization session or advances its security
+revision.
+
+The gateway emits one aggregate discovery fact instead of one record per tool,
+and exactly one terminal fact for each valid `tools/call` attempt across allow,
+deny, pending approval, quota, validation, upstream, and result failures.
+`RemoteHttpExecutor` measures each `fetch`; upstream latency and byte counts are
+accumulated across safe retries while total latency covers the complete gateway
+path. Platform session and approval lifecycle facts use the same seam. A
+`requestId` and, when available, the audit ID/sequence/hash receipt correlate a
+usage row to compliance evidence without merging the two stores.
+
+Portable Node stores analytics in a MongoDB time-series collection with
+configurable TTL (90 days by default), bounded buffering, and tenant/time query
+limits. Managed cloud emits tenant-indexed rows to Workers Analytics Engine and
+keeps a sibling, tenant-bound exact feed (500 newest events by default) for the
+current query API. Analytics Engine is emission-only in this revision: there is
+no SQL proxy, so the managed API cannot claim complete historical results
+beyond the capped feed. Exact fair-use counters remain authority state and are
+never calculated from Analytics Engine or the feed.
+
+Owner/admin-gated APIs expose summary, time-series, top dimensions, recent
+events, session timelines, tool flows, policy insights, and exact quota
+standing as JSON or CSV. The server injects the authenticated tenant, bounds
+the requested time window, and does not join subject IDs to profile display
+names. The console presents Dashboard, Live, Tools, Identities, Sessions, and
+Policy insights; Live polls every five seconds only while open. WebSockets,
+Mongo change streams, OpenTelemetry exporters, alerts, and SIEM delivery remain
+unimplemented acceptance work. See
+[`docs/usage-observability.md`](./docs/usage-observability.md).
+
+Product-domain events still target versioned CloudEvents-compatible envelopes
+and at-least-once delivery. Required families include configuration
+publication, health/schema change, artifact publication/revocation, connection
+lifecycle, triggers, and suspected security events; that broader event plane is
+not implied by the Insight Plane implementation.
 
 ## Deployment topology
 
@@ -309,7 +358,8 @@ The design is not production evidence. Before a production claim, automated
 tests must prove:
 
 - cross-tenant reads and writes are rejected in every storage adapter;
-- KV stale reads cannot reactivate revoked policy or access;
+- non-authoritative stale reads cannot reactivate revoked policy or access, and
+  authority collections never fall back silently to KV;
 - concurrent policy/identity mutations serialize through Durable Objects;
 - MongoDB transactions and outbox recovery survive worker failure;
 - discovery filtering and direct execution denial agree;

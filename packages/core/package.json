@@ -20,6 +20,7 @@
     "types": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@litemcp/analytics": "workspace:*",
     "@litemcp/contracts": "workspace:*",
     "@litemcp/storage": "workspace:*",
     "zod": "catalog:"

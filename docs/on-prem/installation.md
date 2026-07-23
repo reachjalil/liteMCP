@@ -12,11 +12,13 @@ provider, or a secrets manager.
 
 | Path | Intended use | MongoDB |
 |---|---|---|
-| Docker Compose | Local evaluation and single-host testing | Bundled, single-member replica set without database authentication |
+| Docker Compose | Local evaluation and single-host testing | Bundled, authenticated single-member replica set with a keyfile |
 | Helm | Staging and production Kubernetes | External replica set or managed MongoDB service |
 
-The Compose database is reachable only on its internal Docker network, but it
-does not enable MongoDB authentication. Do not use it as a production database.
+The Compose database is reachable only on its internal Docker network and
+requires client credentials; replica-set members use a keyfile. It still uses a
+single member and the bootstrap/root account, with no bundled TLS or managed
+secret system, so it is not a production database topology.
 
 ## Prerequisites
 
@@ -52,10 +54,14 @@ real-cluster smoke test requires those missing tools.
 
    ```bash
    cp deploy/docker-compose/.env.example deploy/docker-compose/.env
-   openssl rand -base64 48
+   openssl rand -base64 48 # BETTER_AUTH_SECRET
+   openssl rand -base64 48 # CREDENTIAL_MASTER_KEY
+   openssl rand -hex 32    # MONGODB_PASSWORD (URI-safe)
+   openssl rand -base64 48 # MONGODB_REPLICA_SET_KEY
    ```
 
-2. Put the generated value in `BETTER_AUTH_SECRET` in the new `.env` file. Do
+2. Put the generated values in their corresponding `.env` entries. Keep the
+   MongoDB password URI-safe because Compose embeds it in a connection URI. Do
    not commit that file.
 
 3. Validate and start the stack:

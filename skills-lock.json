@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "skills": {
+    "harness-config": {
+      "source": "reachjalil/harness-config",
+      "ref": "main",
+      "sourceType": "github",
+      "skillPath": "library/skills/harness-config/SKILL.md",
+      "computedHash": "b6d209a83f5bdc8bb8a39ce899f16b813fe45c05e9b23dbeeaa11c826b5f0c44"
+    }
+  }
+}

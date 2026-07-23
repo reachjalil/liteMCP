@@ -29,7 +29,7 @@ export const productPages: ProductPage[] = [
     description:
       "Compose pinned MCP server definitions behind one stable endpoint today; richer schema diff, promotion, and collision workflows remain on the roadmap.",
     summary:
-      "Composer is a working preview for namespaced, version-pinned tool composition. Cross-target import, full protocol objects, and release promotion still require end-to-end proof.",
+      "Composer is a working preview for namespaced, version-pinned tool composition and strict portable import/export. Full protocol objects and live cross-target promotion still require end-to-end proof.",
     signal: "Versioned, inspectable, reversible",
     stage: "Preview",
     capabilities: [
@@ -159,7 +159,7 @@ export const productPages: ProductPage[] = [
     description:
       "Issue scoped gateway sessions today and evaluate Better Auth federation wiring, while connected accounts and production claim mapping remain planned.",
     summary:
-      "The identity preview binds an authenticated subject to organization context and a short-lived MCP session. It does not yet broker upstream credentials.",
+      "The identity preview binds authenticated subjects and service principals to roles, organization context, and short-lived MCP sessions. Live provider validation and upstream credential brokering remain open.",
     signal: "A principal, not a bearer token",
     stage: "Preview",
     capabilities: [
@@ -224,7 +224,7 @@ export const productPages: ProductPage[] = [
     description:
       "Hide disallowed capabilities before discovery and enforce the decision again when a caller attempts execution.",
     summary:
-      "The current policy slice filters tool discovery, rechecks execution, and explains deterministic decisions. Authoring and distributed activation are still preview work.",
+      "The current policy slice supports draft authoring, linting, simulation, single-active activation, discovery filtering, and deterministic execution decisions. Live distributed-target validation remains preview work.",
     signal: "Default deny, explained",
     stage: "Preview",
     capabilities: [
@@ -243,7 +243,7 @@ export const productPages: ProductPage[] = [
       {
         title: "Human approval",
         description:
-          "Pause sensitive actions and bind a pending record to the exact request; independent decision and resume are not shipped.",
+          "Pause sensitive actions before dispatch, decide through the console or API, and allow only an identical one-shot retry. Arguments are not retained for automatic server-side resume.",
         status: "Preview",
       },
       {
@@ -352,16 +352,16 @@ export const productPages: ProductPage[] = [
     eyebrow: "Evidence plane",
     title: "Trace the decision, not just the HTTP request.",
     description:
-      "Correlate the current discovery, authorization, upstream execution, and audit path while approval resume, credential use, and full telemetry remain roadmap work.",
+      "Understand payload-free MCP usage, latency, client attribution, policy decisions, approvals, and audit-linked session flows from one tenant-scoped surface.",
     summary:
-      "Request-correlated, redacted audit metadata is available now. OpenTelemetry, SIEM delivery, SLOs, and externally anchored evidence remain roadmap work.",
+      "Usage analytics and the tamper-evident audit chain are separate by design: analytics is high-volume and fail-open, while audit evidence remains fail-closed. OpenTelemetry, alerts, SIEM delivery, SLOs, and external anchoring remain roadmap work.",
     signal: "Metadata by default",
     stage: "Preview",
     capabilities: [
       {
-        title: "End-to-end traces",
+        title: "Usage and latency",
         description:
-          "Correlate gateway, policy, selected upstream, and outcome metadata without claiming a credential-broker span.",
+          "Graph tool attempts, denials, errors, total and upstream latency, reported MCP clients, identities, and sessions without storing arguments or results.",
         status: "Preview",
       },
       {
@@ -371,45 +371,45 @@ export const productPages: ProductPage[] = [
         status: "Available now",
       },
       {
-        title: "Health and SLOs",
+        title: "Governance insights",
         description:
-          "Measure probe health, latency, error classes, saturation, and connector reliability.",
-        status: "Planned",
+          "Inspect matched-rule hits, zero-hit rules, denial hotspots, approval latency, discovery conversion, unused visible tools, and tool-to-tool flows.",
+        status: "Preview",
       },
       {
         title: "Open export",
         description:
-          "Export audit configuration today; standards-based trace, metric, and SIEM delivery remains planned.",
+          "Export tenant-filtered analytics as hardened CSV or JSON. Standards-based telemetry and SIEM push delivery remain planned.",
         status: "Preview",
       },
     ],
     workflow: [
       {
         step: "01",
-        title: "Correlate",
+        title: "Observe",
         description:
-          "Assign a request identity and carry it through every internal and upstream boundary.",
+          "Capture one strict, payload-free fact at each discovery, decision, approval, session, and terminal call boundary.",
       },
       {
         step: "02",
-        title: "Explain",
+        title: "Investigate",
         description:
-          "Record decision inputs, matched policy, route, approval state, and result metadata.",
+          "Move from trends to a tool, subject ID, or session timeline and its request-correlated audit receipt.",
       },
       {
         step: "03",
-        title: "Export",
+        title: "Tune",
         description:
-          "Stream standards-based telemetry without requiring payload collection.",
+          "Use rule hits, denials, visible-but-unused tools, and flows to refine least-privilege policy.",
       },
     ],
     controls: [
-      "OpenTelemetry traces",
-      "Structured logs",
+      "Usage and latency graphs",
+      "Live polling feed",
       "Append-only audit events",
-      "SIEM export",
-      "Payload redaction",
-      "Retention policy",
+      "CSV and JSON export",
+      "Payload-free dimensions",
+      "Configurable retention",
     ],
   },
   {
@@ -488,11 +488,11 @@ export const productLinks = productPages.map(({ slug, title }) => ({
 
 export const publicNavigation = [
   { href: "/product/composer", label: "Product" },
-  { href: "/cloud", label: "Managed cloud" },
-  { href: "/open-source", label: "Open source" },
+  { href: "/security", label: "Security" },
   { href: "/docs", label: "Docs" },
+  { href: "/open-source", label: "Open source" },
   { href: "/pricing", label: "Pricing" },
-  { href: "/enterprise", label: "Enterprise" },
+  { href: "/design-partners", label: "Design partners" },
 ];
 
 export const platformLayers = [

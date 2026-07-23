@@ -4,6 +4,7 @@ import "../styles/global.css";
 
 const apiBaseUrl = import.meta.env.PUBLIC_API_ORIGIN ?? import.meta.env.API_ORIGIN ?? "";
 const defaultDemoMode = import.meta.env.LITEMCP_DEMO_MODE === "true";
+const demoModeAvailable = defaultDemoMode;
 ---
 
 <!doctype html>
@@ -15,8 +16,8 @@ const defaultDemoMode = import.meta.env.LITEMCP_DEMO_MODE === "true";
       name="description"
       content="Operate MCP servers, compositions, identities, policy decisions, approvals, and audit evidence."
     />
-    <meta name="theme-color" content="#080a09" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 fill=%22%23111%22/><path d=%22M8 8h5v11h11v5H8z%22 fill=%22%2335c895%22/></svg>" />
+    <meta name="theme-color" content="#080b10" />
+    <link rel="icon" href="/favicon.svg" />
     <title>Console — LiteMCP Composer</title>
     <script is:inline>
       const storedTheme = localStorage.getItem("litemcp-theme");
@@ -25,7 +26,12 @@ const defaultDemoMode = import.meta.env.LITEMCP_DEMO_MODE === "true";
   </head>
   <body>
     <a class="skip-link" href="#console-content">Skip to console content</a>
-    <ConsoleApp client:only="react" apiBaseUrl={apiBaseUrl} defaultDemoMode={defaultDemoMode} />
+    <ConsoleApp
+      client:only="react"
+      apiBaseUrl={apiBaseUrl}
+      defaultDemoMode={defaultDemoMode}
+      demoModeAvailable={demoModeAvailable}
+    />
     <noscript>This control plane requires JavaScript to load and mutate API data.</noscript>
   </body>
 </html>
