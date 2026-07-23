@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>LiteMCP Composer</title>
+  <rect width="32" height="32" fill="#070a0f"/>
+  <path d="M16 3 29 16 16 29 3 16Z" fill="none" stroke="#e6a069" stroke-width="2"/>
+  <path d="m16 8 8 8-8 8-8-8Z" fill="none" stroke="#58d7cf" stroke-width="1.5"/>
+  <path d="M16 11v10M11 16h10" stroke="#f4f0e8" stroke-width="1.25"/>
+</svg>

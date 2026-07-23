@@ -4,42 +4,68 @@ import SiteLayout from "../layouts/SiteLayout.astro";
 const capabilities = [
   {
     index: "01",
-    title: "Compose",
-    description: "Put built-in and remote tools behind one stable, namespaced endpoint.",
+    lore: "The Convergence",
+    title: "Gather every realm",
+    description: "Put built-in and remote tools behind one stable, namespaced MCP endpoint.",
   },
   {
     index: "02",
-    title: "Govern",
+    lore: "The Charter",
+    title: "Set the wards",
     description: "Apply default-deny policy at discovery and again before execution.",
   },
   {
     index: "03",
-    title: "Prove",
-    description: "Bind one-shot approval to exact context and record payload-free evidence.",
+    lore: "The Seal",
+    title: "Approve exact context",
+    description: "Bind one-shot approval to the session, tool, arguments, and governing context.",
+  },
+  {
+    index: "04",
+    lore: "The Chronicle",
+    title: "Keep the evidence",
+    description: "Correlate payload-free usage facts with redacted, sequence-linked audit receipts.",
   },
 ];
+
+const passage = ["Authenticate", "Discover", "Recheck", "Approve", "Execute", "Record"];
 ---
 
-<SiteLayout description="Govern MCP access through one identity-aware endpoint with filtered discovery, exact-context approvals, and payload-free evidence.">
+<SiteLayout
+  description="Bring approved MCP servers behind one governed, identity-aware gateway. Filter tools by role, approve sensitive actions, and keep payload-free evidence."
+  bodyClass="relaylands-page"
+>
   <section class="home-hero">
+    <img
+      class="home-hero__art"
+      src="/images/relaylands/relaylands-hero.webp"
+      alt=""
+      width="1915"
+      height="821"
+      loading="eager"
+      fetchpriority="high"
+    />
     <div class="shell home-hero__inner">
       <div class="home-hero__stage">
         <div class="home-hero__copy">
-          <p class="eyebrow">Open-source MCP governance</p>
-          <h1 class="home-hero__headline">Govern every MCP call.</h1>
+          <p class="eyebrow">The Sovereign Gate · Open-source MCP governance</p>
+          <h1 class="home-hero__headline">One Gate.<br /><strong>Every MCP Realm.</strong></h1>
           <p class="home-hero__description">
-            Put approved MCP servers behind one identity-aware endpoint. Filter tools by role,
-            approve sensitive actions, and record evidence without retaining arguments or results.
+            Bring the MCP servers you approve behind one identity-aware endpoint. Filter tools by role,
+            require exact-context approval, and record evidence without retaining arguments or results.
           </p>
           <div class="home-hero__actions">
-            <a class="button button--accent button--large" href="/docs/getting-started#five-minute-proof">Try locally — 5 min</a>
-            <a class="button button--inverted button--large" href="/design-partners">Apply for a pilot</a>
+            <a class="button button--accent button--large" href="/docs/getting-started#five-minute-proof">
+              Run the local proof <span aria-hidden="true">— 5 min</span>
+            </a>
+            <a class="button button--inverted button--large" href="/design-partners#apply">Apply for the managed pilot</a>
           </div>
+          <p class="home-hero__motto"><span aria-hidden="true">✦</span> Identity before entry. Permission before passage.</p>
         </div>
 
         <aside class="proof-terminal" aria-label="Five-minute local product proof">
           <div class="proof-terminal__header">
-            <span>Five-minute proof</span>
+            <span>The four trials</span>
             <span>Local</span>
           </div>
           <div class="proof-terminal__command">
@@ -52,7 +78,7 @@ const capabilities = [
             <li><span>PASS</span> Exact-context approval</li>
             <li><span>PASS</span> Payload-free evidence</li>
           </ul>
-          <p class="proof-terminal__note">No account. No call-home.</p>
+          <p class="proof-terminal__note">No account. No tribute. No call-home.</p>
         </aside>
       </div>
 
@@ -64,30 +90,123 @@ const capabilities = [
     </div>
   </section>
 
-  <section class="home-capabilities" aria-label="Core capabilities">
+  <section class="relay-intro">
+    <div class="shell relay-intro__grid">
+      <div>
+        <p class="eyebrow">Welcome to the Relaylands</p>
+        <h2>Scattered realms.<br />One lawful passage.</h2>
+      </div>
+      <div class="relay-intro__copy">
+        <p>
+          For platform and security teams governing agent access across multiple MCP servers. At
+          the Gate, identity names the traveler, policy opens the route, and evidence closes the tale.
+        </p>
+        <a href="/product/composer">Explore the gateway <span aria-hidden="true">↗</span></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="home-capabilities" aria-labelledby="capabilities-title">
+    <div class="shell home-capabilities__heading">
+      <p class="eyebrow">The Gatehouse</p>
+      <h2 id="capabilities-title">Four controls. One passage.</h2>
+    </div>
     <div class="shell home-capabilities__grid">
       {capabilities.map((capability) => (
         <article>
-          <span>{capability.index}</span>
-          <h2>{capability.title}</h2>
+          <div class="home-capabilities__index">
+            <span>{capability.index}</span>
+            <span>{capability.lore}</span>
+          </div>
+          <h3>{capability.title}</h3>
           <p>{capability.description}</p>
         </article>
       ))}
     </div>
   </section>
 
-  <section class="home-choice">
-    <div class="shell home-choice__inner">
+  <section class="relay-atlas" aria-labelledby="atlas-title">
+    <div class="shell relay-atlas__header">
       <div>
-        <p class="eyebrow">Open core, clear boundary</p>
-        <h2>Run it yourself. Or pilot it with us.</h2>
-        <p>
-          The complete public product boundary is Apache 2.0. Managed Cloud is currently
-          available as a qualified design-partner pilot.
-        </p>
+        <p class="eyebrow">The living atlas</p>
+        <h2 id="atlas-title">All roads meet at the Gate.</h2>
       </div>
-      <a class="button button--primary" href="/pricing">Compare deployment options</a>
+      <p>
+        Independent domains keep their shape. The Gatehouse controls what crosses between them.
+      </p>
+    </div>
+
+    <figure class="shell relay-atlas__figure">
+      <div class="relay-atlas__frame">
+        <img
+          src="/images/relaylands/relaylands-atlas.webp"
+          alt="An original illustrated systems atlas with five independent domains connected through a central governed gateway."
+          width="1448"
+          height="1086"
+          loading="lazy"
+          decoding="async"
+        />
+        <span class="relay-atlas__coordinate relay-atlas__coordinate--north" aria-hidden="true">R-01 · Remote server</span>
+        <span class="relay-atlas__coordinate relay-atlas__coordinate--center" aria-hidden="true">G-00 · Governed gateway</span>
+        <span class="relay-atlas__coordinate relay-atlas__coordinate--south" aria-hidden="true">E-04 · Evidence trail</span>
+      </div>
+      <figcaption>
+        <span><b>Clients</b> enter with trusted identity</span>
+        <span><b>Gateway</b> filters discovery, rechecks policy, and pauses for approval</span>
+        <span><b>Domains</b> expose only permitted tools</span>
+        <span><b>Chronicle</b> records payload-free usage facts</span>
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="relay-passage" aria-labelledby="passage-title">
+    <div class="shell relay-passage__header">
+      <p class="eyebrow">From request to evidence</p>
+      <h2 id="passage-title">Every crossing faces the Gate.</h2>
+    </div>
+    <ol class="shell relay-passage__steps">
+      {passage.map((step, index) => (
+        <li>
+          <span>{String(index + 1).padStart(2, "0")}</span>
+          <strong>{step}</strong>
+          {index < passage.length - 1 ? <i aria-hidden="true">→</i> : null}
+        </li>
+      ))}
+    </ol>
+    <p class="shell relay-passage__note">Sensitive actions pause at the Seal. Denied routes stop before execution.</p>
+  </section>
+
+  <section class="home-choice">
+    <div class="shell home-choice__header">
+      <p class="eyebrow">The Open Charter</p>
+      <h2>Raise your own gate.<br />Or pilot one with us.</h2>
+    </div>
+    <div class="shell home-choice__grid">
+      <article>
+        <span>Independent Gatehouse</span>
+        <h3>No distant throne required.</h3>
+        <p>Apache 2.0. No private package, vendor account, license server, or mandatory call-home.</p>
+        <a href="/docs/self-hosting">Self-hosting guide <span aria-hidden="true">↗</span></a>
+      </article>
+      <article>
+        <span>Stewarded Gatehouse</span>
+        <h3>Shape the managed pilot.</h3>
+        <p>Managed Cloud is currently available only to qualified design partners—not as a public production service.</p>
+        <a href="/design-partners#apply">Apply for the pilot <span aria-hidden="true">↗</span></a>
+      </article>
     </div>
     <p class="shell home-choice__status">Pre-1.0 · local proof passed · production acceptance in progress</p>
+  </section>
+
+  <section class="relay-final">
+    <div class="shell relay-final__inner">
+      <p class="eyebrow">Chart the first route</p>
+      <h2>Bring order<br />to every MCP realm.</h2>
+      <p>Start with the real local proof. Keep the whole Gatehouse inside your walls.</p>
+      <div class="relay-final__actions">
+        <a class="button button--accent button--large" href="/docs/getting-started#five-minute-proof">Try the local proof</a>
+        <a class="button button--inverted button--large" href="/docs">Read the field guide</a>
+      </div>
+    </div>
   </section>
 </SiteLayout>

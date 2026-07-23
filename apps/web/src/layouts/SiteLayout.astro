@@ -21,8 +21,12 @@ const {
 const siteName = "LiteMCP Composer";
 const resolvedTitle = title
   ? `${title} — ${siteName}`
-  : `${siteName} — Governed MCP composition`;
+  : `${siteName} — Govern Every MCP Realm`;
 const canonical = new URL(path, Astro.site ?? "https://litemcpcomposer.com").toString();
+const socialImage = new URL(
+  "/images/relaylands/relaylands-social.webp",
+  Astro.site ?? "https://litemcpcomposer.com",
+).toString();
 ---
 
 <!doctype html>
@@ -33,29 +37,40 @@ const canonical = new URL(path, Astro.site ?? "https://litemcpcomposer.com").toS
     <meta name="generator" content={Astro.generator} />
     <title>{resolvedTitle}</title>
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#080a09" />
+    <meta name="theme-color" content="#080b10" />
+    <link rel="icon" href="/favicon.svg" />
     <link rel="canonical" href={canonical} />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={siteName} />
     <meta property="og:title" content={resolvedTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content={socialImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="LiteMCP Composer Relaylands gateway connecting independent MCP domains" />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={resolvedTitle} />
     <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={socialImage} />
     {noIndex ? <meta name="robots" content="noindex, nofollow" /> : null}
     <script is:inline>
       (() => {
         try {
           const stored = localStorage.getItem("litemcp-theme");
-          document.documentElement.dataset.theme = stored || "dark";
+          const theme = stored || "dark";
+          document.documentElement.dataset.theme = theme;
+          document.querySelector('meta[name="theme-color"]')?.setAttribute(
+            "content",
+            theme === "dark" ? "#080b10" : "#f1ece2",
+          );
         } catch {
           document.documentElement.dataset.theme = "dark";
         }
       })();
     </script>
   </head>
-  <body class={bodyClass}>
+  <body class:list={["public-site", bodyClass]}>
     <a class="skip-link" href="#main-content">Skip to content</a>
     <SiteHeader currentPath={Astro.url.pathname} />
     <main id="main-content">
@@ -70,6 +85,10 @@ const canonical = new URL(path, Astro.site ?? "https://litemcpcomposer.com").toS
           const dark = document.documentElement.dataset.theme === "dark";
           button.setAttribute("aria-label", `Switch to ${dark ? "light" : "dark"} theme`);
           button.dataset.mode = dark ? "dark" : "light";
+          document.querySelector('meta[name="theme-color"]')?.setAttribute(
+            "content",
+            dark ? "#080b10" : "#f1ece2",
+          );
         };
         syncLabel();
         button.addEventListener("click", () => {
